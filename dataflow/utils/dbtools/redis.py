@@ -5,7 +5,7 @@ import time
 from contextlib import contextmanager
 from dataflow.utils.log import Logger
 
-_logger = Logger('utils.redis')
+_logger = Logger('utils.dbtools.redis')
 
 
 # REDIS_CONFIG = {

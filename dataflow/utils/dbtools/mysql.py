@@ -3,8 +3,9 @@ from contextlib import contextmanager
 from dataflow.utils.log import Logger
 from dbutils.pooled_db import PooledDB
 from dataflow.utils.utils import PageResult
+import yaml
 
-_logger = Logger('utils.db')
+_logger = Logger('utils.dbtools.mysql')
 
 # DB_CONFIG = {
 #     'host': '192.168.18.145',
@@ -16,6 +17,20 @@ _logger = Logger('utils.db')
 #     'autocommit': True,
 #     'cursorclass': pymysql.cursors.DictCursor
 # }
+
+
+# DB_CONFIG = {
+#         # 'host': '192.168.18.145',
+#         # 'port': 3306,
+#         'host': 'localhost',
+#         'port': 60306,
+#         'user': 'stock_agent',
+#         'password': '1qaz2wsx',
+#         'db': 'stock_agent',
+#         'charset': 'utf8',
+#         'autocommit': True,
+#         'cursorclass': pymysql.cursors.DictCursor
+#     }
 
 class DBTools:
     def __init__(self, **kwargs):        
@@ -191,4 +206,57 @@ class DBTools:
     def closeConnection(self, connection):
         _logger.DEBUG(f"Close {connection}")
         connection.close()
+
+
+def initMysqlWithConfig(config)->DBTools:
+    if config is None:
+        DB_CONFIG = {}
+    else:
+        if hasattr(config, '__dict__'):
+            DB_CONFIG = vars(config)
+        else:
+            if isinstance(config, dict):
+                DB_CONFIG = dict(config)
+            else:
+                DB_CONFIG = config
+                            
+    DB_CONFIG['cursorclass'] = pymysql.cursors.DictCursor
+    
+    _logger.DEBUG(f'数据库初始化 {DB_CONFIG}')
+    
+    dbtools = DBTools(**DB_CONFIG)
+    
+    if 'test' in DB_CONFIG:
+        test = dbtools.queryOne(DB_CONFIG['test'])
+    else:
+        test = dbtools.queryOne('select 1')
+        
+    if test is None:
+        raise Exception(f'数据库不能访问 {DB_CONFIG}')
+    
+    return dbtools
+
+def initMysqlWithYaml(config_file='mysql.yaml')->DBTools:
+    try:
+        with open(config_file, 'r', encoding='utf-8') as f:
+            DB_CONFIG = yaml.safe_load(f)['db']
+    except Exception as e:
+        _logger.ERROR('配置错误，使用默认配置', e)
+        DB_CONFIG = {
+            'host': '192.168.18.145',
+            'port': 3306,
+            # 'host': 'localhost',
+            # 'port': 60306,
+            'user': 'stock_agent',
+            'password': '1qaz2wsx',
+            'db': 'stock_agent',
+            'charset': 'utf8',
+            'autocommit': True
+        }
+    DB_CONFIG['cursorclass'] = pymysql.cursors.DictCursor
+    return initMysqlWithConfig(DB_CONFIG)
+
+
+
+
 

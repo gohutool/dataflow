@@ -7,7 +7,10 @@ from dataflow.utils.utils import current_millsecond
 import uuid
 from dataflow.utils.asgi import custom_authcheck_decorator
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from fastapi import status
 from contextlib import asynccontextmanager
+from dataflow.utils.dbtools.mysql import initMysqlWithConfig, initMysqlWithYaml
 
 _logger = Logger('endpoint')
 
@@ -16,6 +19,8 @@ _logger = Logger('endpoint')
 async def lifespan(app: FastAPI):
     # 启动时执行的代码
     _logger.INFO("Application startup")
+    
+    initMysqlWithYaml('conf/db.yaml')
     
     yield
     # 关闭时执行的代码
@@ -81,5 +86,9 @@ app.add_middleware(
 
 @app.get("/test")
 async def test_endpoint():
-    print('测试中间件顺序')
-    return {"message": "测试中间件顺序"}
+    _logger.INFO('测试中间件顺序')
+    return JSONResponse(
+        status_code=status.HTTP_200_OK, 
+        content={"message": "测试中间件顺序"}
+    )
+    # return {"message": "测试中间件顺序"}
