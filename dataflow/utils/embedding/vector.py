@@ -50,8 +50,6 @@ def Get_CrossEncoder(name: str) -> CrossEncoder:
             _MODEL_CACHE_2[name] = CrossEncoder(name)
         return _MODEL_CACHE_2[name]    
 
-
-
 def load_pdf_text(file_path:str)->List[any]:
     # loader = PyPDFLoader("./RAG/pdf/健康档案.pdf")
     loader = PyPDFLoader(file_path)
@@ -66,6 +64,14 @@ def load_pdf_text(file_path:str)->List[any]:
 
 def emb_text(embedding_model:SentenceTransformer, text)->List:
     return embedding_model.encode([text], normalize_embeddings=True).tolist()[0]
+
+def simliar_cosine(embedding_model:SentenceTransformer, query:str, doc:str)->float:    
+    query_embedding = embedding_model.encode(query)
+    doc_embeddings = embedding_model.encode([doc])
+    
+    _logger.DEBUG(f'query_embedding.shape={query_embedding.shape} doc_embeddings.shape={doc_embeddings.shape}')    
+    scores = np.dot(doc_embeddings, query_embedding) / (np.linalg.norm(doc_embeddings, axis=1) * np.linalg.norm(query_embedding))
+    return scores[0]
 
 def rerank(reranker_model:CrossEncoder, query:str, candidates:List[str],rerank_top:Optional[int]=10)->List:
     if rerank_top is None:
@@ -109,10 +115,16 @@ if __name__ == "__main__":
     print("=== SentenceTransformer (双塔模型) ===")
     # 编码所有句子
     query_embedding = t.encode(query)
+    print(query_embedding.shape)
     doc_embeddings = t.encode(documents)
+    print(doc_embeddings.shape)
     # 计算余弦相似度
     scores = np.dot(doc_embeddings, query_embedding) / (np.linalg.norm(doc_embeddings, axis=1) * np.linalg.norm(query_embedding))
     for i, score in enumerate(scores):
+        print(f"文档 {i+1} 相似度: {score:.4f}")
+        
+    for i, doc in enumerate(documents):    
+        score = simliar_cosine(t, query, doc)
         print(f"文档 {i+1} 相似度: {score:.4f}")
     
     # model_name = "Qwen/Qwen3-Reranker-0.6B"

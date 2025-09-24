@@ -1,11 +1,15 @@
 dbutils==3.1.1
 fastapi==0.117.1
+langchain_community==0.3.29
+langchain_text_splitters==0.3.11
 numpy==2.3.3
 pandas==2.3.2
+pydantic==2.11.9
 pymilvus==2.5.6
 PyMySQL==1.1.1
 pytz==2025.2
 PyYAML==6.0.2
 PyYAML==6.0.2
-Requests==2.32.5
+sentence_transformers==4.1.0
+tenacity==9.1.2
 uvicorn==0.37.0
