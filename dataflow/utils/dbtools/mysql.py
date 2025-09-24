@@ -32,7 +32,7 @@ _logger = Logger('utils.dbtools.mysql')
 #         'cursorclass': pymysql.cursors.DictCursor
 #     }
 
-class DBTools:
+class MysqlTools:
     def __init__(self, **kwargs):        
         self.__config__ = kwargs
         self.__dbpool = PooledDB(
@@ -208,7 +208,7 @@ class DBTools:
         connection.close()
 
 
-def initMysqlWithConfig(config)->DBTools:
+def initMysqlWithConfig(config)->MysqlTools:
     if config is None:
         DB_CONFIG = {}
     else:
@@ -224,7 +224,7 @@ def initMysqlWithConfig(config)->DBTools:
     
     _logger.DEBUG(f'数据库初始化 {DB_CONFIG}')
     
-    dbtools = DBTools(**DB_CONFIG)
+    dbtools = MysqlTools(**DB_CONFIG)
     
     if 'test' in DB_CONFIG:
         test = dbtools.queryOne(DB_CONFIG['test'])
@@ -236,7 +236,7 @@ def initMysqlWithConfig(config)->DBTools:
     
     return dbtools
 
-def initMysqlWithYaml(config_file='mysql.yaml')->DBTools:
+def initMysqlWithYaml(config_file='mysql.yaml')->MysqlTools:
     try:
         with open(config_file, 'r', encoding='utf-8') as f:
             DB_CONFIG = yaml.safe_load(f)['db']

@@ -1,9 +1,11 @@
 import redis
 import uuid
-import redis.typing
+from redis.typing import ResponseT
 import time
 from contextlib import contextmanager
 from dataflow.utils.log import Logger
+from dataflow.utils.utils import current_datetime_str
+import yaml
 
 _logger = Logger('utils.dbtools.redis')
 
@@ -18,6 +20,7 @@ _logger = Logger('utils.dbtools.redis')
 class RedisTools:
     def __init__(self, host='localhost', port=6379, db=0, password=None):
         self.__redis_client__ = redis.StrictRedis(host=host, port=port, db=db, password=password, decode_responses=True)
+        _logger.DEBUG(f"RediesClient {self.__redis_client__}")
 
     @contextmanager
     def with_lock(self, lock_name, acquire_timeout=10, lock_timeout=600):
@@ -72,7 +75,7 @@ class RedisTools:
         _logger.DEBUG(f'Release lock with {identifier}[lock_name={lock_name} result={rtn}]')
         return rtn
 
-    def set(self, key, value, ex=None):
+    def set(self, key, value, ex=None)-> ResponseT:
         """
         设置键值对
         :param key: 键
@@ -90,7 +93,7 @@ class RedisTools:
         """
         return self.__redis_client__.get(key)
 
-    def delete(self, key):
+    def delete(self, key)-> ResponseT:
         """
         删除键
         :param key: 键
@@ -127,3 +130,53 @@ class RedisTools:
 
     def ttl(self, key)->redis.typing.ResponseT:
         return self.__redis_client__.ttl(key)
+
+
+
+
+def initRedisWithConfig(config)->RedisTools:
+    if config is None:
+        _REDIS_CONFIG = {}
+    else:
+        if hasattr(config, '__dict__'):
+            _REDIS_CONFIG = vars(config)
+        else:
+            if isinstance(config, dict):
+                _REDIS_CONFIG = dict(config)
+            else:
+                _REDIS_CONFIG = config
+    
+    _logger.DEBUG(f'数据库Redis初始化 {_REDIS_CONFIG}')
+                            
+    _redis = RedisTools(**_REDIS_CONFIG)
+    
+    test_key = "test_key"
+    
+    if 'test' in _REDIS_CONFIG:
+        test =_REDIS_CONFIG['test']
+    
+    test = _redis.set(test_key, current_datetime_str())
+        
+    if test is None :
+        raise Exception(f'数据库Redis不能访问 {_REDIS_CONFIG}')
+    
+    return _redis
+
+def initRedisWithYaml(config_file='redis.yaml')->RedisTools:    
+    try:
+        with open(config_file, 'r', encoding='utf-8') as f:
+            _REDIS_CONFIG = yaml.safe_load(f)['redis']
+    except Exception as e:
+        _logger.ERROR('配置错误，使用默认配置', e)
+        _REDIS_CONFIG = {
+            # 'host': '192.168.18.145',
+            # 'port': 6379,
+            'host':'localhost', 
+            'port':60379, 
+            'db':14, 
+            'password':'Lszx)hz@redis_20201014'
+        }
+    
+    return initRedisWithConfig(_REDIS_CONFIG)    
+
+    

@@ -11,6 +11,8 @@ from fastapi.responses import JSONResponse
 from fastapi import status
 from contextlib import asynccontextmanager
 from dataflow.utils.dbtools.mysql import initMysqlWithConfig, initMysqlWithYaml
+from dataflow.utils.dbtools.redis import initRedisWithConfig, initRedisWithYaml
+from dataflow.utils.dbtools.milvus import initMilvusWithConfig, initMilvusWithYaml
 
 _logger = Logger('endpoint')
 
@@ -21,6 +23,8 @@ async def lifespan(app: FastAPI):
     _logger.INFO("Application startup")
     
     initMysqlWithYaml('conf/db.yaml')
+    initRedisWithYaml('conf/redis.yaml')
+    initMilvusWithYaml('conf/milvus.yaml')
     
     yield
     # 关闭时执行的代码
