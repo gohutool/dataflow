@@ -9,6 +9,7 @@ import importlib
 import pytz
 import json
 from typing import List, Any, Optional
+import time, uuid
 
 def date_datetime_cn(dt:datetime=None):
     if dt is None:
@@ -198,6 +199,12 @@ def dataframe_to_list(df:DataFrame)->List[dict]:
 # console_handler.setLevel(logging.DEBUG)
 # console_handler.setFormatter(formatter)
 # __logger.addHandler(console_handler)
+
+def current_time()->float:
+    return time.time()
+
+def current_millsecond()-> int:
+    return int(current_time() * 1000)
 
 def current_datetime():
     return datetime.now()
