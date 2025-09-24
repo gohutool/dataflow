@@ -1,6 +1,6 @@
 import pymysql
 from contextlib import contextmanager
-from dataflow.utils.logtools import Logger
+from dataflow.utils.log import Logger
 from dbutils.pooled_db import PooledDB
 from dataflow.utils.utils import PageResult
 

@@ -3,7 +3,7 @@ import uuid
 import redis.typing
 import time
 from contextlib import contextmanager
-from dataflow.utils.logtools import Logger
+from dataflow.utils.log import Logger
 
 _logger = Logger('utils.redis')
 
