@@ -1,0 +1,5 @@
+milvus:
+  # host: 192.168.18.145
+  # port: 3306
+  uri: https://milvus.ginghan.com
+  db_name: default

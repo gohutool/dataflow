@@ -8,8 +8,8 @@ import traceback
 import importlib
 import pytz
 import json
-from typing import List, Any, Optional
-import time, uuid
+from typing import Any, Optional
+import time
 
 def date_datetime_cn(dt:datetime=None):
     if dt is None:
@@ -232,7 +232,7 @@ def date2str_yyyymmddddmmss(date):
     return date.strftime("%Y-%m-%d %H:%M:%S")
 
 def date2str_yyyymmddhhmmsss(date):
-    return date.strftime("%Y-%m-%d %H:%M:%S.%f")
+    return date.strftime("%Y-%m-%d %H:%M:%S.%f")[:-2]
 
 def str2datestr_yyyymmddhhmmsss(date_str):    
     return date2str_yyyymmdd(str2date_yyyymmddhhmmsss(date_str))

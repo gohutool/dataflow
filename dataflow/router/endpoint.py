@@ -1,18 +1,17 @@
 
 # 导入 FastAPI 框架
-from fastapi import FastAPI, Request, HTTPException
-import requests
-from dataflow.utils.log import Logger
+from fastapi import FastAPI, Request, Depends, HTTPException # noqa: F401
 from dataflow.utils.utils import current_millsecond
 import uuid
-from dataflow.utils.web.asgi import custom_authcheck_decorator
+from dataflow.utils.web.asgi import custom_authcheck_decorator  # noqa: F401
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi import status
 from contextlib import asynccontextmanager
-from dataflow.utils.dbtools.mysql import initMysqlWithConfig, initMysqlWithYaml
-from dataflow.utils.dbtools.redis import initRedisWithConfig, initRedisWithYaml
-from dataflow.utils.dbtools.milvus import initMilvusWithConfig, initMilvusWithYaml
+from dataflow.utils.dbtools.mysql import initMysqlWithYaml
+from dataflow.utils.dbtools.redis import initRedisWithYaml
+from dataflow.utils.dbtools.milvus import initMilvusWithYaml
+from dataflow.utils.log import Logger
 
 _logger = Logger('endpoint')
 
@@ -31,12 +30,27 @@ async def lifespan(app: FastAPI):
     _logger.INFO("Application shutdown")
     
 
+# 基础全局依赖：验证 API Key
+async def verify_api_key(request: Request):
+    api_key = request.headers.get("X-API-Key")
+    
+    if not api_key:
+        raise HTTPException(status_code=401, detail="API Key missing")
+    
+    # 简单的验证逻辑（实际应用中应该更复杂）
+    if api_key != "your-secret-api-key":
+        raise HTTPException(status_code=403, detail="Invalid API Key")
+    
+    # 验证通过，可以继续
+    return {"api_key": api_key}
+    
+
 # 创建一个 FastAPI 应用实例
 app = FastAPI(lifespan=lifespan,
               title="DataFlow API",
               version="1.0.0",
+              dependencies=[Depends(verify_api_key)]
             )   
-
 
 @app.middleware("http")
 async def authcheck_handler(request: Request, call_next):
