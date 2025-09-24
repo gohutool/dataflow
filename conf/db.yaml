@@ -1,0 +1,13 @@
+db:
+  # host: 192.168.18.145
+  # port: 3306
+  host: localhost
+  port: 61306
+  user: stock_agent
+  password: 1qaz2wsx
+  db: stock_agent
+  charset: utf8
+  autocommit: true
+  maxconnections: 20
+  mincached: 3
+  maxcached: 10

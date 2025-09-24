@@ -1,0 +1,7 @@
+redis:
+  # host: 192.168.18.145
+  # port: 6379
+  host: localhost
+  port: 60379
+  db: 14
+  password: 'Lszx)hz@redis_20201014'

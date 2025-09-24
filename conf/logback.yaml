@@ -1,0 +1,59 @@
+version: 1
+disable_existing_loggers: False
+formatters:
+  simple:
+    format: '%(levelname)s:[%(_filename)s:%(_lineno)d]     [%(name)s] - %(asctime)s - %(message)s'
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: simple
+    # encoding: utf-8
+    stream: ext://sys.stdout
+  file:
+    class: logging.handlers.RotatingFileHandler
+    level: DEBUG
+    formatter: simple
+    filename: logs/ea.log
+    maxBytes: 10485760  # 10 MB
+    backupCount: 5
+    encoding: utf-8
+loggers:
+  apscheduler:
+    level: WARN
+    handlers: [console, file]
+  main:
+    level: INFO
+    handlers: [console, file]
+    propagate: False
+  utils:
+    level: INFO
+    handlers: [console, file]
+    propagate: False
+  strategy:
+    level: INFO
+    handlers: [console, file]
+    propagate: False
+  dao:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: False
+  utils.db:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: False
+  uvicorn:
+    level: INFO
+    handlers: [console, file]
+    propagate: False
+  Downloader:
+    level: INFO
+    handlers: [console, file]
+    propagate: False
+  # utils.dao:
+  #   level: INFO
+  #   handlers: [console, file]
+  #   propagate: False
+root:
+  level: INFO
+  handlers: [console, file]
