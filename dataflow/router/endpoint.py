@@ -5,7 +5,7 @@ import requests
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import current_millsecond
 import uuid
-from dataflow.utils.asgi import custom_authcheck_decorator
+from dataflow.utils.web.asgi import custom_authcheck_decorator
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi import status
