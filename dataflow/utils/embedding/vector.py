@@ -36,18 +36,19 @@ def Get_sentence_transformer(name: str) -> SentenceTransformer:
             _MODEL_CACHE[name] = SentenceTransformer(name)
         return _MODEL_CACHE[name]
     
-def Get_CrossEncoder(name: str) -> CrossEncoder:
+def Get_CrossEncoder(name: str, **args) -> CrossEncoder:
     """
     线程安全的 CrossEncoder 单例工厂
     :param name: 模型名（如 'BAAI/bge-reranker-base'）
     :return: 单例模型实例
     """
+    _logger.DEBUG(f'Get_CrossEncoder[{name}] with {args}')
     if name in _MODEL_CACHE_2:               # 快速路径无锁
         return _MODEL_CACHE_2[name]
 
     with _lock:                            # 并发加载保护
         if name not in _MODEL_CACHE_2:       # 二次检查
-            _MODEL_CACHE_2[name] = CrossEncoder(name)
+            _MODEL_CACHE_2[name] = CrossEncoder(name, **args)
         return _MODEL_CACHE_2[name]    
 
 def load_pdf_text(file_path:str)->List[any]:
@@ -73,6 +74,16 @@ def simliar_cosine(embedding_model:SentenceTransformer, query:str, doc:str)->flo
     scores = np.dot(doc_embeddings, query_embedding) / (np.linalg.norm(doc_embeddings, axis=1) * np.linalg.norm(query_embedding))
     return scores[0]
 
+def crossencoder_token_set(c :CrossEncoder):
+    c.tokenizer.pad_token = c.tokenizer.eos_token
+    c.config.pad_token_id = c.tokenizer.eos_token_id
+    
+    # if crossEncoder.tokenizer.pad_token is None and crossEncoder.tokenizer.eos_token is not None:
+    #     crossEncoder.tokenizer.pad_token = crossEncoder.tokenizer.eos_token        
+    # if crossEncoder.tokenizer.pad_token_id is None and crossEncoder.tokenizer.eos_token_id is not None:
+    #     crossEncoder.tokenizer.pad_token_id = crossEncoder.tokenizer.eos_token_id
+    
+
 def rerank(reranker_model:CrossEncoder, query:str, candidates:List[str],rerank_top:Optional[int]=10)->List:
     if rerank_top is None:
         rerank_top = len(candidates)
@@ -83,6 +94,7 @@ def rerank(reranker_model:CrossEncoder, query:str, candidates:List[str],rerank_t
 
 def similar_ranker(reranker_model:CrossEncoder, src: str, dest:str)->float:
     return reranker_model.predict([(src, dest)])[0]
+
 
 # d:\HF_HOME>set HF_ENDPOINT=https://alpha.hf-mirror.com/
 # d:\HF_HOME>huggingface-cli download google-bert/bert-base-chinese  --local-dir ./
@@ -134,6 +146,7 @@ if __name__ == "__main__":
     
     # 2. 使用 CrossEncoder (交叉编码器) 计算相似度
     print("\n=== CrossEncoder (交叉编码器) ===")
+    print(f"使用模型：{model_name}") 
     # 组合句子对
     pairs = [[query, doc] for doc in documents]
     # 直接得到分数
@@ -149,3 +162,43 @@ if __name__ == "__main__":
     
     for i, score in enumerate(scores):
         print(f"文档 {i+1} {score[0]} 相似度: {score[1]:.4f}")
+    
+    reranker = Get_CrossEncoder(model_name,
+                            max_length=8192)      
+    # 2. 使用 CrossEncoder (交叉编码器) 计算相似度
+    print("\n=== CrossEncoder (交叉编码器) ===")
+    print(f"使用模型：{model_name}") 
+      
+    # reranker.eval()
+    query = "今年中秋节是哪天？"
+    docs = ["2025 年中秋节是 10 月 6 日。",
+            "2025 年国庆节是 10 月 1 日。",
+            "2025 年端午节是 6 月 2 日。"]
+    
+    scores = reranker.predict([(query, d) for d in docs])  
+    sorted_docs = [(score, d) for score, d in sorted(zip(scores, docs), reverse=True)]
+    print("重排结果：", sorted_docs)
+    
+    
+    model_name = "BAAI/bge-reranker-base"
+    
+    c = Get_CrossEncoder(model_name,
+                            max_length=8192)
+    # 2. 使用 CrossEncoder (交叉编码器) 计算相似度
+    print("\n=== CrossEncoder (交叉编码器) ===")
+    print(f"使用模型：{model_name}") 
+      
+        # 同样先补 pad_token
+    # c.tokenizer.pad_token = c.tokenizer.eos_token
+    # c.config.pad_token_id = c.tokenizer.eos_token_id
+    # c.eval()
+    # crossencoder_token_set(c)
+    
+    scores = rerank(c, query, docs)
+    for i, score in enumerate(scores):
+        print(f"文档 {i+1} {score[0]} 相似度: {score[1]:.4f}")
+        
+    for i, doc in enumerate(docs):
+        score = similar_ranker(c, query, doc)
+        print(f"文档 {i+1} 相似度: {score:.4f}")
+    

@@ -12,6 +12,9 @@ from dataflow.utils.dbtools.mysql import initMysqlWithYaml
 from dataflow.utils.dbtools.redis import initRedisWithYaml
 from dataflow.utils.dbtools.milvus import initMilvusWithYaml
 from dataflow.utils.log import Logger
+from dataflow.utils.web.asgi import get_ipaddr
+from dataflow.utils.config import settings
+from dataflow.utils.web.metrics import setup_metrics 
 
 _logger = Logger('endpoint')
 
@@ -25,6 +28,11 @@ async def lifespan(app: FastAPI):
     initRedisWithYaml('conf/redis.yaml')
     initMilvusWithYaml('conf/milvus.yaml')
     
+    _logger.INFO(f'DS={settings.getList('DataSource')}')
+    _logger.INFO(f'MYSQLDS={settings.getDict('MYSQLDS')}')
+    _logger.INFO(f'REDIS={settings.getDict('REDIS')}')
+    _logger.INFO(f'MILVUS={settings.getDict('MILVUS')}')
+    
     yield
     # 关闭时执行的代码
     _logger.INFO("Application shutdown")
@@ -33,6 +41,7 @@ async def lifespan(app: FastAPI):
 # 基础全局依赖：验证 API Key
 async def verify_api_key(request: Request):
     api_key = request.headers.get("X-API-Key")
+    print(f'api_key={api_key}')
     
     if not api_key:
         raise HTTPException(status_code=401, detail="API Key missing")
@@ -51,6 +60,16 @@ app = FastAPI(lifespan=lifespan,
               version="1.0.0",
               dependencies=[Depends(verify_api_key)]
             )   
+
+setup_metrics(app)
+
+# from langfuse import Langfuse
+
+# langfuse = Langfuse(
+#   secret_key="sk-lf-b60f4b33-ff5a-46ac-9086-e776373c86da",
+#   public_key="pk-lf-4172303b-f7c4-4dc0-9d77-184d99c06131",
+#   host="https://us.cloud.langfuse.com"
+# )
 
 @app.middleware("http")
 async def authcheck_handler(request: Request, call_next):
@@ -86,9 +105,11 @@ async def costtime_handler(request: Request, call_next):
     response = await call_next(request)
     # ====== 响应阶段 ======
     cost = (current_millsecond() - start)
+    
+    ip = get_ipaddr(request)
 
     response.headers["X-Cost-ms"] = str(cost)
-    _logger.INFO(f"[{{request.url}}] {response.status_code} {cost:.2f}ms")
+    _logger.INFO(f"[{request.url}][{ip}] {response.status_code} {cost:.2f}ms")
     return response
 
 
