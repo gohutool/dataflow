@@ -97,8 +97,11 @@ class PydbcTools:
         _logger.DEBUG(f"[Parameter]:{params}")
         try:
             with self.engine.begin() as connection:
-                results = connection.execute(text(sql), params).fetchall()   # 参数为Dict                    
-                return results
+                results = connection.execute(text(sql), params).fetchall()   # 参数为Dict    
+                rtn = []
+                for one in results:
+                    rtn.append(one._asdict())                
+                return rtn
         except Exception as e:
             _logger.ERROR("[Exception]", e)
             raise e
@@ -135,7 +138,21 @@ class PydbcTools:
                 
                 params['_offset_'] = offset
                 params['_pagesize_'] = pagesize
-                list = self.queryMany(sql + ' limit :_offset_, :_pagesize_', params)
+                sql_wrap = sql + ' LIMIT :_pagesize_  OFFSET :_offset_ '
+                if self.engine.dialect.name == "postgresql": # ("postgresql", "mysql", "sqlite", "clickhouse", "openGauss", "dm", "kingbase")
+                    sql_wrap = sql + ' LIMIT :_pagesize_  OFFSET :_offset_ '
+                elif self.engine.dialect.name == "mysql":
+                    # sql_wrap = sql + ' LIMIT :_pagesize_  OFFSET :_offset_ '
+                    sql_wrap = sql + ' LIMIT :_offset_, :_pagesize_  '
+                elif self.engine.dialect.name == "oracle":
+                    sql_wrap = f'SELECT * FROM (SELECT t.*, ROWNUM rn FROM ({sql}) t) WHERE rn BETWEEN :_offset_ + 1 AND :_offset_ + :_pagesize_ '
+                elif self.engine.dialect.name == "mssql":
+                    sql_wrap = sql + ' OFFSET :_offset_ ROWS FETCH NEXT :_pagesize_ ROWS ONLY'
+                elif self.engine.dialect.name == "hive":
+                    sql_wrap = f'SELECT * FROM (SELECT t.*, ROW_NUMBER() OVER (ORDER BY 1) AS rn FROM ({sql}) t) WHERE rn BETWEEN :_offset_ + 1 AND :_offset_ + :_pagesize_ '                                        
+                    
+                
+                list = self.queryMany(sql_wrap, params)
                         
                 return PageResult(total, pagesize, 1, (total + pagesize - 1)//pagesize, list)
 
@@ -225,3 +242,10 @@ if __name__ == "__main__":
     print(p.queryOne('select * from sa_security_realtime_daily limit 10'))
     print(p.queryPage('select * from sa_security_realtime_daily order by tradedate desc', None, page=1, pagesize=10))        
     print(p.queryPage('select * from sa_security_realtime_daily where code=:code order by tradedate desc', {'code':'300492'}, page=1, pagesize=10))
+    
+    url = 'postgresql+psycopg2://u:p@pgvector.ginghan.com:29432/aiproxy'
+    p = PydbcTools(url=url, username='postgres', password='aiproxy', test='select 1')
+    print(p)
+    print(p.queryOne('select * from logs limit 10'))
+    print(p.queryPage('select * from logs order by request_at desc', None, page=1, pagesize=10))        
+    print(p.queryPage('select * from logs where endpoint=:code order by request_at desc', {'code':'/v1/chat/completions'}, page=1, pagesize=10))
