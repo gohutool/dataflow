@@ -39,7 +39,7 @@ def initLogWithYaml(config_file='logback.yaml'):
     with open(config_file, 'r', encoding='utf-8') as file:
         config = yaml.safe_load(file)   
     # 应用日志配置
-    logging.config.dictConfig(config)
+    logging.config.dictConfig(config)    
     # 替换默认的 LogRecord 工厂
     # logging.setLogRecordFactory(CustomLogRecord)
         

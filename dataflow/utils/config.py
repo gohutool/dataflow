@@ -9,7 +9,7 @@ from enum import Enum
 from dotenv import load_dotenv
 from dataflow.utils.log import Logger
 from typing import Optional,List,Dict
-from dataflow.utils.utils import str2Num,str_isEmpty
+from dataflow.utils.utils import str2Num,str_isEmpty, str2Bool
 from dataflow.utils.reflect import getAttrPlus
 from omegaconf import OmegaConf
 import threading
@@ -165,7 +165,7 @@ class Settings:
 # Create settings instance
 settings = Settings()
 
-def resolve_custom_env_var(interpolation_str):
+def ___resolve_custom_env_var(interpolation_str):
     """
     解析 'VAR_NAME:default_value' 格式的字符串。
     首先检查环境变量VAR_NAME，若存在则使用其值，否则使用default_value。
@@ -180,7 +180,7 @@ def resolve_custom_env_var(interpolation_str):
     return os.environ.get(var_name, default_value)
 
 # 在加载配置之前注册解析器
-OmegaConf.register_new_resolver("env", resolve_custom_env_var)
+OmegaConf.register_new_resolver("env", ___resolve_custom_env_var)
 
 
 class YamlConfigation:    
@@ -188,8 +188,13 @@ class YamlConfigation:
     _MODEL_CACHE: dict[str, any] = {}
     
     @staticmethod
-    def getConfiguration(yaml_path)->Self:
+    def getConfiguration()->Self:
+        return next(iter(YamlConfigation._MODEL_CACHE.values()))
+    
+    @staticmethod
+    def loadConfiguration(yaml_path:str=None)->Self:
         __logger = Logger('utils.config')
+        
         if yaml_path in YamlConfigation._MODEL_CACHE:               # 快速路径无锁
             __logger.WARN('Load Configuration from memory')
             return YamlConfigation._MODEL_CACHE[yaml_path]
@@ -198,7 +203,7 @@ class YamlConfigation:
             if yaml_path not in YamlConfigation._MODEL_CACHE:       # 二次检查
                 YamlConfigation._MODEL_CACHE[yaml_path] = YamlConfigation(yaml_path)
                 __logger.WARN('Load Configuration from local')
-            return YamlConfigation._MODEL_CACHE[yaml_path]        
+            return YamlConfigation._MODEL_CACHE[yaml_path]
         
     def __init__(self, yaml_path, **kwargs):            
         # 加载 YAML 配置（支持 ${} 占位符）    
@@ -210,15 +215,55 @@ class YamlConfigation:
         c = self.__config
         if str_isEmpty(prefix):
             return c
-        else:
+        else:            
             return getAttrPlus(c,prefix)
+        
+    def getStr(self, key, dv:str=None)->str:
+        c = self.__config
+        obj = getAttrPlus(c, key, None)
+        if str_isEmpty(obj):
+            return dv
+        else:
+            return str(obj)
+        
+    def getBool(self, key, dv:int=None)->bool:
+        c = self.__config
+        obj = getAttrPlus(c, key, None)
+        if str_isEmpty(obj):
+            return dv
+        else:
+            return str2Bool(str(obj))
+        
+    def getInt(self, key, dv:int=None)->int:
+        c = self.__config
+        obj = getAttrPlus(c, key, None)
+        if str_isEmpty(obj):
+            return dv
+        else:
+            return int(str2Num(str(obj)))
+        
+    def getFloat(self, key, dv:float=None)->float:
+        c = self.__config
+        obj = getAttrPlus(c, key, None)
+        if str_isEmpty(obj):
+            return dv
+        else:
+            return str2Num(str(obj))
+        
+    def getList(self, key)->List:
+        c = self.__config
+        obj = getAttrPlus(c, key, None)
+        if str_isEmpty(obj):
+            return []
+        else:
+            return list(obj).copy()
     
 
 if __name__ == "__main__":
     yaml_path = 'conf/application.yaml'
     
-    config = YamlConfigation.getConfiguration(yaml_path)
-    config = YamlConfigation.getConfiguration(yaml_path)
+    config = YamlConfigation.loadConfiguration(yaml_path)
+    config = YamlConfigation.loadConfiguration(yaml_path)
     
     print(config.getConfig())
     

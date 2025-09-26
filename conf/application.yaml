@@ -3,12 +3,12 @@ application:
   version: 1.0.0
 
 server:
-  port: 8080
-  host: 0.0.0.0
+  port: ${env:SERVER_PORT:8080}
+  host: ${env:SERVER_HOST:0.0.0.0}
 
 logging:
   level: ${env:LOG_LEVEL:INFO}
-  file: logs/${application.name}.log
+  config: conf/logback.yaml
 
 database:
   host: "${env:DB_HOST:localhost}"

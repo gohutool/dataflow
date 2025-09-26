@@ -261,6 +261,12 @@ def utf8_urldecode(txt):
     # print("3:", str1)s    
     return s
 
+def str2Bool(s: any, dv=False) -> bool:    
+    if str_isEmpty(s) :
+        return dv
+    s = str(s)
+    return s.lower().strip() in ('true', '1', 'yes', 'on')
+
 def str2Num(s, dv=None):
     try:
         f = float(s.strip())

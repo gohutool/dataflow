@@ -1,7 +1,9 @@
 import uvicorn
 from dataflow.utils.log import Logger, initLogWithYaml
+from dataflow.utils.config import settings, YamlConfigation  # noqa: F401
 import os
 import time
+import logging
 
 # 设置时区（必须在导入其他时间相关模块前设置）
 os.environ["TZ"] = "Asia/Shanghai"
@@ -11,7 +13,7 @@ if hasattr(time, 'tzset'):          # Unix / macOS / WSL
 # if os.name == 'posix':    
 #     time.tzset()  # 使时区生效（仅 Unix 系统有效）
 
-port=45080
+# port=45080
 
 ### USE python3.6.8
 # async def run_server():
@@ -31,14 +33,28 @@ port=45080
 
 ### USE python3.12.10
 
-initLogWithYaml('conf/logback.yaml')
+# initLogWithYaml('conf/logback.yaml')
+c = YamlConfigation.loadConfiguration('conf/application.yaml')
+
+host = c.getStr('server.host', 'localhost')
+port = c.getInt('server.port', 9000)
+
+log_config = c.getStr('logging.config', None)
+if  log_config is not None and  log_config.strip()!='':
+    initLogWithYaml(log_config)
+    print(f'LOG Config : {log_config}')
+
+log_level = c.getStr('logging.level', None)
+if  log_level is not None and  log_level.strip()!='':
+    logging.basicConfig(level=log_level)
+    print(f'LOG Level : {log_level}')
 
 _logger = Logger()
 
 if __name__ == "__main__":
-    _logger.INFO(f"Start server on {port}")
-    uvicorn.run("dataflow.router.endpoint:app", host="0.0.0.0", port=port, reload=False, workers=1)
-    _logger.INFO(f"End server on {port}")
+    _logger.INFO(f"Start server on {host}:{port}")
+    uvicorn.run("dataflow.router.endpoint:app", host=host, port=port, reload=False, workers=1)
+    _logger.INFO(f"End server on {host}:{port}")
     # try:
     #     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
     # except KeyboardInterrupt:
