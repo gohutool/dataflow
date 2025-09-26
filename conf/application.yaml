@@ -10,15 +10,13 @@ logging:
   level: ${env:LOG_LEVEL:INFO}
   file: logs/${application.name}.log
 
-# database:
-#   host: "${DB_HOST:localhost}"
-#   port: "${DB_PORT:3306}"
-#   name: "${DB_NAME:app_db}"
-#   username: "${DB_USER:admin}"
-#   password: "${DB_PASSWORD:password}"
+database:
+  host: "${env:DB_HOST:localhost}"
+  port: "${env:DB_PORT:3306}"
+  name: "${env:DB_NAME:app_db}"
+  username: "${env:DB_USER:admin}"
+  password: "${env:DB_PASSWORD:password}"
 
-
-
-# features:
-#   enabled: true
-#   api_url: "https://api.${server.host}:${server.port}/v1"
+features:
+  enabled: true
+  api_url: "https://api.${server.host}:${server.port}/v1"

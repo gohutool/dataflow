@@ -10,6 +10,7 @@ import pytz
 import json
 from typing import Any, Optional
 import time
+import re
 
 def date_datetime_cn(dt:datetime=None):
     if dt is None:
@@ -109,6 +110,12 @@ def test_na():
     # 打印处理后的 DataFrame
     print("\n处理后的 DataFrame:")
     print(df)
+
+
+def str_strip(txt:str)->str:
+    if str_isEmpty(txt):
+        return None
+    return re.sub(r'\s+', ' ', txt).strip()
 
 def str_isEmpty(txt:str)->bool:
     if txt is None or str(txt).strip() == '':

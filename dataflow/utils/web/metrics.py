@@ -3,7 +3,7 @@
 This module sets up and configures Prometheus metrics for monitoring the application.
 """
 
-from prometheus_client import Counter, Histogram, Gauge
+from prometheus_client import Counter, Histogram, Gauge  # noqa: F401
 from starlette_prometheus import metrics, PrometheusMiddleware
 
 import time
@@ -22,26 +22,43 @@ http_request_duration_seconds = Histogram(
     "http_request_duration_seconds", "HTTP request duration in seconds", ["method", "endpoint"]
 )
 
-# Database metrics
-db_connections = Gauge("db_connections", "Number of active database connections")
+# # Database metrics
+# __db_connections = Gauge("db_connections", "Number of active database connections")
 
-# Custom business metrics
-orders_processed = Counter("orders_processed_total", "Total number of orders processed")
+# # Custom business metrics
+# __orders_processed = Counter("orders_processed_total", "Total number of orders processed")
 
-llm_inference_duration_seconds = Histogram(
+__llm_process_duration_seconds = Histogram(
+    "llm_process_duration_seconds",
+    "Time spent processing LLM",
+    ["model", "label"],
+    buckets=[0.1, 0.3, 0.5, 1.0, 2.0, 5.0, 60]    
+)
+
+__llm_inference_duration_seconds = Histogram(
     "llm_inference_duration_seconds",
     "Time spent processing LLM inference",
     ["model"],
-    buckets=[0.1, 0.3, 0.5, 1.0, 2.0, 5.0]    
+    buckets=[0.1, 0.3, 0.5, 1.0, 2.0, 5.0, 60]    
 )
 
-llm_stream_duration_seconds = Histogram(
+__llm_stream_duration_seconds = Histogram(
     "llm_stream_duration_seconds",
     "Time spent processing LLM stream inference",
     ["model"],
-    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 60]
 )
 
+def llm_duration_stream_metrics(model:str, duration:float)->None:
+    __llm_stream_duration_seconds.labels(model=model).observe(duration)
+
+def llm_duration_inference_metrics(model:str, duration:float)->None:
+    __llm_inference_duration_seconds.labels(model=model).observe(duration)
+
+def llm_duration_metrics(model:str, label:str, duration:float)->None:
+    __llm_process_duration_seconds.labels(model=model, label=label).observe(duration)
+    
+    
 def setup_metrics(app):
     """Set up Prometheus metrics middleware and endpoints.
 
@@ -86,6 +103,6 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             # Record metrics
             http_requests_total.labels(method=request.method, endpoint=request.url.path, status=status_code).inc()
             http_request_duration_seconds.labels(method=request.method, endpoint=request.url.path).observe(duration)
-            self.__logger.INFO(f'http_requests_total={http_requests_total.labels}')
+            self.__logger.DEBUG(f'http_requests_total={http_requests_total.labels}')
 
         return response
