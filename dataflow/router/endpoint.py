@@ -88,7 +88,7 @@ async def xid_handler(request: Request, call_next):
     return response
 
 # @app.middleware("http")
-@filter(app, path='*')
+@filter(app)
 async def costtime_handler(request: Request, call_next):
     # ====== 请求阶段 ======
     start = current_millsecond()
@@ -107,12 +107,12 @@ async def costtime_handler(request: Request, call_next):
     _logger.INFO(f"[{request.url}][{ip}] {response.status_code} {cost:.2f}ms")
     return response
 
-
-origins = ["*"]
+# origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    # allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
