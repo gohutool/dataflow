@@ -79,46 +79,6 @@ def get_remote_address(request: Request) -> str:
     # return request.client.host
     return get_ipaddr(request)
 
-
-class UrlPathMatcher:
-    """
-    模拟 Java Servlet <url-pattern> 匹配规则
-    优先级：精确 > 前缀 > 扩展名 > 缺省
-    """
-    def __init__(self):
-        self.exact: dict[str, str] = {}        # 精确映射
-        self.prefix: List[Tuple[str, str]] = []  # (pattern, value)
-        self.extension: dict[str, str] = {}    # 后缀 -> value        
-
-    # ---------- 注册 ----------
-    def add_pattern(self, pattern: str):
-        if pattern.startswith("/") and pattern.endswith("/*"):
-            prefix = pattern[:-2]            # 去掉 "/*"
-            self.prefix.append((prefix, "1"))
-        elif pattern.startswith("*."):
-            ext = pattern[1:]                # ".jsp"
-            self.extension[ext] = "1"
-        else:
-            self.exact[pattern] = value
-
-    # ---------- 匹配 ----------
-    def match(self, path: str) -> Optional[str]:
-        # 1. 精确
-        if path in self.exact:
-            return self.exact[path]
-        # 2. 前缀（最长优先）
-        for pre, val in sorted(self.prefix, key=lambda x: -len(x[0])):
-            if path.startswith(pre + "/"):
-                return val
-        # 3. 扩展名
-        idx = path.rfind(".")
-        if idx != -1:
-            ext = path[idx:]               # 含点
-            if ext in self.extension:
-                return self.extension[ext]
-        # 4. 缺省
-        return self.default
-
 __matcher = AntPathMatcher()    
 # # 提取路径中的变量
 # variables = matcher.extract_uri_template_variables("/users/{id}", "/users/123")
