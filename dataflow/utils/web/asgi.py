@@ -79,7 +79,7 @@ def get_remote_address(request: Request) -> str:
     # return request.client.host
     return get_ipaddr(request)
 
-__matcher = AntPathMatcher()    
+antmatcher = AntPathMatcher()    
 # # 提取路径中的变量
 # variables = matcher.extract_uri_template_variables("/users/{id}", "/users/123")
 # print(variables) # 输出: {'id': '123'}
@@ -102,7 +102,7 @@ def filter(app:FastAPI, *, path:str='*'):
             async def new_func(request: Request, call_next):         
                 matched = False            
                 for o in paths:
-                    if __matcher.match(o, request.url.path):
+                    if antmatcher.match(o, request.url.path):
                         matched = True
                         break
                 if not matched:
