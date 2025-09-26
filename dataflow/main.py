@@ -52,13 +52,7 @@ if  log_level is not None and  log_level.strip()!='':
 _logger = Logger()
 
 if __name__ == "__main__":
-    _logger.INFO(f"Start server on {host}:{port}")
+    _logger.INFO(f"{c.getStr('application.name', 'DataFlow Application')} {c.getStr('application.version', '1.0.0')} Start server on {host}:{port}")
     uvicorn.run("dataflow.router.endpoint:app", host=host, port=port, reload=False, workers=1)
-    _logger.INFO(f"End server on {host}:{port}")
-    # try:
-    #     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
-    # except KeyboardInterrupt:
-    #     print('CTRL+C to quit')
-    # except Exception as e:
-    #     print('Exit 1 with error {e}', e)
+    _logger.INFO(f"{c.getStr('application.name', 'DataFlow Application')} {c.getStr('application.version', '1.0.0')} End server on {host}:{port}")  
 

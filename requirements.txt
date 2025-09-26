@@ -20,3 +20,4 @@ uvicorn==0.37.0
 langfuse==3.5.1
 omegaconf==2.3.0
 antpathmatcher==1.0.1
+sqlalchemy==2.0.38

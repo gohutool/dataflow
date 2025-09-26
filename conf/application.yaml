@@ -1,6 +1,6 @@
 application:
-  name: MyApplication
-  version: 1.0.0
+  name: DataFlow Application
+  version: 1.0.1-beta
 
 server:
   port: ${env:SERVER_PORT:8080}

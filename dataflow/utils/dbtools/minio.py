@@ -2,7 +2,7 @@ from minio import Minio
 from minio.error import S3Error
 import uuid
 from typing import List
-from dataflow.utils.utils import copy2Dict
+from dataflow.utils.reflect import to_dict
 # from minio.helpers import ObjectWriteResult
 # import urllib3
 
@@ -40,16 +40,16 @@ class MiniTools:
     def list_objects(self, bucket_name:str, prefix:str=None, recursive:bool=True, **kwargs )->List[any]:
         rtn = []
         for obj in self.__client.list_objects(bucket_name, prefix=prefix, recursive=recursive, **kwargs):
-            rtn.append(copy2Dict(obj))
+            rtn.append(to_dict(obj))
         return rtn
 
     def upload_object(self, bucket_name:str, file_id:str, file_path:str):
         result = self.__client.fput_object(bucket_name, file_id, file_path)
-        return copy2Dict(result)
+        return to_dict(result)
 
     def download_object(self, bucket_name:str, file_id:str, file_path:str):
         result = self.__client.fget_object(bucket_name, file_id, file_path)
-        return copy2Dict(result)
+        return to_dict(result)
 
     def create_bucket(self, bucket_name:str)->bool:
         try:
