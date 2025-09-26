@@ -1,6 +1,4 @@
 from importlib import import_module
-from typing import Any
-
 
 def haveAttr(obj:any, attr:str)->bool:
     if obj is None:
@@ -20,22 +18,22 @@ def newInstance(fully_qualified_name: str, *args, **kwargs)->any:
         raise RuntimeError(f"Cannot instantiate {fully_qualified_name}: {e}") from e
     return cls(*args, **kwargs)
 
-def getAttr(data:dict, field:str, dv:any)->any:
+def getAttr(data:dict, field:str, dv:any=None)->any:
     if data is None:
         return dv
     rtn = None
     if isinstance(data, dict):
-        if haveAttr(data, field):
+        if field in data:
             rtn = data[field]
     else:
-        obj = getattr(data, field, None)
+        rtn = getattr(data, field, None)
         
     if rtn is None:
         rtn = dv   
         
     return rtn
 
-def getAttrPlus(data:dict, field:str, dv:any)->any:
+def getAttrPlus(data:dict, field:str, dv:any=None)->any:
     if data is None:
         return dv
     rtn = None
@@ -45,7 +43,7 @@ def getAttrPlus(data:dict, field:str, dv:any)->any:
     """'a.b.c' -> 逐层取值"""
     for key in field.split('.'):        
         if isinstance(obj, dict):
-            if haveAttr(obj, key):
+            if key in obj:
                 obj = obj[key]
             else:
                 obj = None
@@ -57,6 +55,8 @@ def getAttrPlus(data:dict, field:str, dv:any)->any:
         
     if obj is None:
         rtn = dv
+    else:
+        rtn = obj
             
     return rtn
 

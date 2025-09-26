@@ -1,0 +1,24 @@
+application:
+  name: MyApplication
+  version: 1.0.0
+
+server:
+  port: 8080
+  host: 0.0.0.0
+
+logging:
+  level: ${env:LOG_LEVEL:INFO}
+  file: logs/${application.name}.log
+
+# database:
+#   host: "${DB_HOST:localhost}"
+#   port: "${DB_PORT:3306}"
+#   name: "${DB_NAME:app_db}"
+#   username: "${DB_USER:admin}"
+#   password: "${DB_PASSWORD:password}"
+
+
+
+# features:
+#   enabled: true
+#   api_url: "https://api.${server.host}:${server.port}/v1"

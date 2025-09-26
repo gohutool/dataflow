@@ -111,7 +111,7 @@ def test_na():
     print(df)
 
 def str_isEmpty(txt:str)->bool:
-    if txt is None or txt.strip() == '':
+    if txt is None or str(txt).strip() == '':
         return True
     return False
 

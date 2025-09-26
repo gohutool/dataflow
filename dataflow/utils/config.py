@@ -9,8 +9,11 @@ from enum import Enum
 from dotenv import load_dotenv
 from dataflow.utils.log import Logger
 from typing import Optional,List,Dict
-from dataflow.utils.utils import str2Num
-
+from dataflow.utils.utils import str2Num,str_isEmpty
+from dataflow.utils.reflect import getAttrPlus
+from omegaconf import OmegaConf
+import threading
+from typing import Self
 
 __logger = Logger('utils.config')
 
@@ -104,7 +107,7 @@ class Settings:
             value = str2Num(f'{value}', dv)
         return int(value)
     
-    def getStr(self, env, dv:Optional[int]=0)->str:
+    def getStr(self, env, dv:Optional[str]=0)->str:
         value = os.getenv(env)
         if value is None:
             value = dv
@@ -161,3 +164,63 @@ class Settings:
 
 # Create settings instance
 settings = Settings()
+
+def resolve_custom_env_var(interpolation_str):
+    """
+    解析 'VAR_NAME:default_value' 格式的字符串。
+    首先检查环境变量VAR_NAME，若存在则使用其值，否则使用default_value。
+    """
+    # 分割字符串，获取环境变量名和默认值    
+    if ':' in interpolation_str:
+        var_name, default_value = interpolation_str.split(':', 1)
+    else:
+        # 如果没有提供默认值，则设为空字符串
+        var_name, default_value = interpolation_str, ''
+    # 从环境变量获取值，如果不存在则使用默认值
+    return os.environ.get(var_name, default_value)
+
+# 在加载配置之前注册解析器
+OmegaConf.register_new_resolver("env", resolve_custom_env_var)
+
+
+class YamlConfigation:    
+    _lock: any = threading.Lock()
+    _MODEL_CACHE: dict[str, any] = {}
+    
+    @staticmethod
+    def getConfiguration(yaml_path)->Self:
+        __logger = Logger('utils.config')
+        if yaml_path in YamlConfigation._MODEL_CACHE:               # 快速路径无锁
+            __logger.WARN('Load Configuration from memory')
+            return YamlConfigation._MODEL_CACHE[yaml_path]
+
+        with YamlConfigation._lock:                            # 并发加载保护
+            if yaml_path not in YamlConfigation._MODEL_CACHE:       # 二次检查
+                YamlConfigation._MODEL_CACHE[yaml_path] = YamlConfigation(yaml_path)
+                __logger.WARN('Load Configuration from local')
+            return YamlConfigation._MODEL_CACHE[yaml_path]        
+        
+    def __init__(self, yaml_path, **kwargs):            
+        # 加载 YAML 配置（支持 ${} 占位符）    
+        c = OmegaConf.load(yaml_path)    
+        # OmegaConf.resolve(c)
+        self.__config = OmegaConf.to_container(c, resolve=True)
+        
+    def getConfig(self, prefix:str=None)->dict:
+        c = self.__config
+        if str_isEmpty(prefix):
+            return c
+        else:
+            return getAttrPlus(c,prefix)
+    
+
+if __name__ == "__main__":
+    yaml_path = 'conf/application.yaml'
+    
+    config = YamlConfigation.getConfiguration(yaml_path)
+    config = YamlConfigation.getConfiguration(yaml_path)
+    
+    print(config.getConfig())
+    
+    print(f'server={config.getConfig('server')} server.port={config.getConfig('server.port')}')
+    
