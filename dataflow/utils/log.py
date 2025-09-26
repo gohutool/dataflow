@@ -6,6 +6,27 @@ import inspect
 import os
 from dataflow.utils.utils import date_datetime_cn, date2str_yyyymmddhhmmsss
 
+__defaul_config = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {'format': '%(levelname)s:[%(_filename)s:%(_lineno)d][%(name)s] - %(asctime_cn)s - %(message)s'}
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+            'level': 'INFO',
+        }
+    },
+    'root': {          # 全局 logger
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}
+
+logging.config.dictConfig(__defaul_config)
+
 class CustomLogRecord(logging.LogRecord):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
