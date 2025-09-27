@@ -93,7 +93,7 @@ class PydbcTools:
     #         raise e
     
     def queryMany(self, sql, params:dict=None):
-        _logger.DEBUG(f"[SQL]:{sql}")
+        _logger.INFO(f"[SQL]:{sql}")
         _logger.DEBUG(f"[Parameter]:{params}")
         try:
             with self.engine.begin() as connection:
@@ -249,3 +249,16 @@ if __name__ == "__main__":
     print(p.queryOne('select * from logs limit 10'))
     print(p.queryPage('select * from logs order by request_at desc', None, page=1, pagesize=10))        
     print(p.queryPage('select * from logs where endpoint=:code order by request_at desc', {'code':'/v1/chat/completions'}, page=1, pagesize=10))
+    
+    
+    # url = 'oracle+cx_oracle://u:p@localhost:1521/?service_name=XE'
+    url = 'oracle+oracledb://u:p@localhost:60521/?service_name=ORCL'
+    p = PydbcTools(url=url, username='system', password='orcl', test='select 1 from dual')
+    print(p)
+    print(p.queryOne('SELECT * FROM dba_registry'))
+    print(p.queryPage('SELECT * FROM dba_registry', None, page=1, pagesize=10))        
+    print(p.queryPage("SELECT * FROM dba_registry where version like '%'||:version||'%' order by comp_id desc", {'version':'19'}, page=1, pagesize=10))
+    
+    
+    
+    
