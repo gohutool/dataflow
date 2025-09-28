@@ -10,7 +10,7 @@ import os # noqa: F401
 import numpy as np
 
 
-_logger = Logger('utils.embedding.vector')
+_logger = Logger('utils.llm.vector')
 
 
 # os.environ['HF_ENDPOINT']='http://hf-mirror.com'

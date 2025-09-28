@@ -10,13 +10,11 @@ from fastapi import status
 from contextlib import asynccontextmanager
 from dataflow.utils.log import Logger
 from dataflow.utils.web.asgi import get_ipaddr
-from dataflow.module.context.metrics import setup_metrics 
 from dataflow.module.context.web import filter
 from dataflow.module import Context
 from dataflow.utils.reflect import is_not_primitive
 from dataflow.utils.utils import json_to_str
 # from datetime import datetime,date
-import json
 
 
 _logger = Logger('router.endpoint')
@@ -52,8 +50,7 @@ app = FastAPI(lifespan=lifespan,
 @Context.Context(app=app, scan='dataflow.application.**')
 def initApp(app:FastAPI):
     _logger.INFO(f'开始初始化App={app}')
-            
-    setup_metrics(app)
+    
     @app.middleware("http")
     async def authcheck_handler(request: Request, call_next):
         # ====== 请求阶段 ======

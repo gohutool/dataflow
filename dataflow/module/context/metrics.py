@@ -14,6 +14,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
 from dataflow.utils.log import Logger
+from dataflow.module import WebContext
+
+_logger = Logger('module.context.metrics')
 
 # Request metrics
 http_requests_total = Counter("http_requests_total", "Total number of HTTP requests", ["method", "endpoint", "status"])
@@ -71,14 +74,15 @@ def setup_metrics(app):
 
     # Add metrics endpoint
     app.add_route("/prometheus/metrics", metrics)
+    _logger.INFO('Metrics组件加载成功')
+    
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):
     """Middleware for tracking HTTP request metrics."""
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)        
-        self.__logger = Logger('utils.web.metrics')
-        self.__logger.INFO('启动MetricsMiddleware任务')
+        super().__init__(*args, **kwargs)                
+        _logger.INFO('初始化MetricsMiddleware过滤器')
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Track metrics for each request.
@@ -103,6 +107,10 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             # Record metrics
             http_requests_total.labels(method=request.method, endpoint=request.url.path, status=status_code).inc()
             http_request_duration_seconds.labels(method=request.method, endpoint=request.url.path).observe(duration)
-            self.__logger.DEBUG(f'http_requests_total={http_requests_total.labels}')
+            _logger.DEBUG(f'http_requests_total={http_requests_total.labels}')
 
         return response
+
+
+setup_metrics(WebContext.getRoot())
+
