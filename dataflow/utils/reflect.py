@@ -145,9 +145,10 @@ def dict2obj(obj: object, d: dict) -> object:
             setattr(obj, k, v)
     return obj    
 
-def import_lib(base):
-    _logger.INFO(f'import_lib-->加载包{base}')
-    return importlib.import_module(base)
+def import_lib(base):    
+    mod = importlib.import_module(base)
+    _logger.INFO(f'import_lib-->加载包{base}[{"PKG" if hasattr(mod, '__path__') else "MOD" }]')
+    return mod
 
 def loadlib_by_path(path: str) -> List:
     """
@@ -165,7 +166,7 @@ def loadlib_by_path(path: str) -> List:
     # 3. 加载根
     root_mod = import_lib(base)
     _logger.DEBUG(f'{dir(root_mod)}')
-    loaded = [base]
+    loaded = [(base, hasattr(root_mod, '__path__'))]
 
     if recursive is None:               # 仅单个模块
         return loaded
@@ -178,7 +179,7 @@ def loadlib_by_path(path: str) -> List:
         for _, name, ispkg in pkgutil.iter_modules(path):
             full_name = prefix + name
             import_lib(full_name)
-            loaded.append(full_name)
+            loaded.append((full_name, ispkg))
             if recursive and ispkg:          # ** 模式才继续深入
                 sub = import_lib(full_name)
                 walk(sub.__path__, full_name + '.')

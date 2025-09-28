@@ -1,10 +1,8 @@
 
 from functools import wraps
 from typing import Callable
-from fastapi import Request, HTTPException, FastAPI
-from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi import Request, HTTPException
 from dataflow.utils.log import Logger
-from dataflow.utils.utils import str_isEmpty,str_strip
 from antpathmatcher import AntPathMatcher
 
 _logger = Logger('utils.web.asgi')

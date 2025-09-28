@@ -5,7 +5,7 @@ application:
 server:
   port: ${env:SERVER_PORT:8080}
   host: ${env:SERVER_HOST:0.0.0.0}
-
+  
 logging:
   level: ${env:LOG_LEVEL:INFO}
   config: conf/logback.yaml
