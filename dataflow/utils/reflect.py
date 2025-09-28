@@ -3,6 +3,7 @@ from typing import Any, Optional, List
 import importlib
 import pkgutil
 from dataflow.utils.log import Logger
+from dataflow.utils.utils import current_millsecond
 import sys 
 
 _logger = Logger('utils.reflect')
@@ -145,9 +146,11 @@ def dict2obj(obj: object, d: dict) -> object:
             setattr(obj, k, v)
     return obj    
 
-def import_lib(base):    
+def import_lib(base):   
+    start = current_millsecond()
     mod = importlib.import_module(base)
-    _logger.INFO(f'import_lib-->加载包{base}[{"PKG" if hasattr(mod, '__path__') else "MOD" }]')
+    cost = (current_millsecond() - start)
+    _logger.INFO(f'import_lib-->加载包{base}[{"PKG" if hasattr(mod, '__path__') else "MOD" }] 耗时{cost:.2f}毫秒')
     return mod
 
 def loadlib_by_path(path: str) -> List:
@@ -186,6 +189,12 @@ def loadlib_by_path(path: str) -> List:
 
     walk(root_mod.__path__, base + '.')
     return loaded
+
+# 定义原始类型
+primitive_types = (int, float, bool, str, type(None))
+
+def is_not_primitive(obj):
+    return not isinstance(obj, primitive_types)
 
 # ------------------- demo -------------------
 if __name__ == '__main__':

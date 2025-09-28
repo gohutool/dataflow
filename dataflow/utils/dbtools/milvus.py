@@ -63,7 +63,7 @@ class MilvusTools:
         dim: int,
         metric_type: str = "COSINE",
         tokenizer: str = "english",
-        drop_if_exist: bool = True,
+        drop_if_exist: bool = False,
     ) -> None:
         """创建支持 稠密向量 + BM25 全文 的集合"""
         if drop_if_exist and self.__client.has_collection(name):
@@ -75,6 +75,8 @@ class MilvusTools:
                          enable_analyzer=True, 
                          analyzer_params={"type": tokenizer})
         schema.add_field("dense_vec", DataType.FLOAT_VECTOR, dim=dim)
+        # 1. 先声明稀疏向量字段（关键）
+        schema.add_field("sparse_vec", DataType.SPARSE_FLOAT_VECTOR)  
 
         # BM25 函数
         schema.add_function(

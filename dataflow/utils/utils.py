@@ -11,6 +11,7 @@ import json
 from typing import Any, Optional
 import time
 import re
+# from pydantic import BaseModel, Field
 
 def date_datetime_cn(dt:datetime=None):
     if dt is None:
@@ -206,6 +207,25 @@ def dataframe_to_list(df:DataFrame)->List[dict]:
 # console_handler.setLevel(logging.DEBUG)
 # console_handler.setFormatter(formatter)
 # __logger.addHandler(console_handler)
+
+
+
+# 一劳永逸
+def _datetime_converter(obj: object) -> str:
+    """
+    把 datetime / date 对象转成 ISO-8601 字符串
+    """    
+    if isinstance(obj, (datetime, datetime.date)):        
+        return date2str_yyyymmddddmmss(obj)
+    raise TypeError(f"Unsupported type: {type(obj)}")
+
+json.JSONEncoder.default = staticmethod(_datetime_converter)
+
+def json_to_str(obj:any):
+    return json.dumps(obj, ensure_ascii=False, separators=(',', ':'))
+
+def str_to_json(txt:str)->dict|list:
+    return json.loads(txt)
 
 def current_time()->float:
     return time.time()
@@ -498,6 +518,11 @@ def build_market(code:str, market:str='SH'):
 
 
 class PageResult:
+    # total :int = Field(0, description="总条数")
+    # pagesize :int = Field(10, description="每页大小")    
+    # page :int = Field(1, description="页序号")
+    # totalPage :int = Field(0, description="总页数")
+    # list : Optional[List[Any]] = Field([], description="行记录")
     # total,pagesize,page,totalPage,list
     
     # def __init__(self, total=0, pagesize=10, page=1, totalPage=0, list=None):
@@ -541,9 +566,36 @@ class PageResult:
         """
         return hash((self.total, self.pagesize, self.page, self.totalPage, tuple(self.list)))
 
+    
+    # ① 供 Pydantic 序列化
+    def dict(self) -> dict:
+        return {
+            "total": self.total,
+            "pagesize": self.pagesize,
+            "page": self.page,
+            "totalPage": self.totalPage,
+            "list": self.list,
+        }
+
+    
     def __repr__(self):
         """
         定义对象的字符串表示。
         """
         return (f"PageResult(total={self.total}, pagesize={self.pagesize}, "
                 f"page={self.page}, totalPage={self.totalPage}, list={self.list})")
+
+class ReponseVO:
+    # status: bool = Field(True, description="响应状态")
+    # msg: str = Field('成功', description="返回消息")
+    # data: Any = Field(None, description="返回数据")
+    def __init__(self, status:bool=True, msg:str='成功', data:any=None): 
+        self.status = status
+        self.msg = msg
+        self.data = data
+        
+    def __repr__(self):
+        """
+        定义对象的字符串表示。
+        """
+        return (f"ReponseVO(status={self.status}, msg={self.msg}, data={self.data}")

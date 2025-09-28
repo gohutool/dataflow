@@ -6,6 +6,8 @@ from contextlib import contextmanager
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import current_datetime_str
 import yaml
+from dataflow.utils.utils import json_to_str, str_to_json
+from dataflow.utils.reflect import is_not_primitive
 
 _logger = Logger('utils.dbtools.redis')
 
@@ -83,6 +85,8 @@ class RedisTools:
         :param ex: 过期时间（秒）
         :return: 是否成功
         """
+        if is_not_primitive(value):
+            value = json_to_str(value)
         return self.__redis_client__.set(key, value, ex=ex)
 
     def get(self, key):
@@ -92,6 +96,17 @@ class RedisTools:
         :return: 值
         """
         return self.__redis_client__.get(key)
+    
+    def getObject(self, key)->list|dict:
+        """
+        获取键的值
+        :param key: 键
+        :return: 值
+        """
+        rtn = self.__redis_client__.get(key)
+        if rtn:
+            rtn = str_to_json(rtn)
+        return rtn
 
     def delete(self, key)-> ResponseT:
         """
@@ -108,7 +123,9 @@ class RedisTools:
         :param key: 键
         :param value: 值
         :return: 是否成功
-        """
+        """        
+        if is_not_primitive(value):
+            value = json_to_str(value)
         return self.__redis_client__.hset(name, key, value)
 
     def hget(self, name, key):
@@ -119,6 +136,19 @@ class RedisTools:
         :return: 值
         """
         return self.__redis_client__.hget(name, key)
+    
+    
+    def hgetObject(self, name, key):
+        """
+        获取哈希表中的键值
+        :param name: 哈希表名称
+        :param key: 键
+        :return: 值
+        """
+        rtn = self.__redis_client__.hget(name, key)
+        if rtn :
+            rtn = str_to_json(rtn)
+        return rtn
 
     def hgetall(self, name):
         """

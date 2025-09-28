@@ -1,4 +1,4 @@
-from dataflow.module.context import Context
+from dataflow.module import Context
 
 
 @Context.Configurationable(prefix='context.test')
