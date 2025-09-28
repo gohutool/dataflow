@@ -14,7 +14,7 @@ from dataflow.utils.dbtools.milvus import initMilvusWithYaml
 from dataflow.utils.log import Logger
 from dataflow.utils.web.asgi import get_ipaddr, filter
 from dataflow.utils.config import settings
-from dataflow.utils.web.metrics import setup_metrics 
+from dataflow.module.context.metrics import setup_metrics 
 
 _logger = Logger('endpoint')
 
@@ -87,8 +87,7 @@ async def xid_handler(request: Request, call_next):
     response.headers["X-Request-ID"] = rid
     return response
 
-# @app.middleware("http")
-@filter(app)
+@filter(app, excludes='/test,/test/**')
 async def costtime_handler(request: Request, call_next):
     # ====== 请求阶段 ======
     start = current_millsecond()
@@ -133,5 +132,7 @@ def initApp(app:FastAPI):
 
 
 initApp(app=app)
+    
+    
     
     
