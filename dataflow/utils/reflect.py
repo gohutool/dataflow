@@ -1,5 +1,12 @@
 from importlib import import_module
 from typing import Any, Optional, List
+import importlib
+import pkgutil
+from dataflow.utils.log import Logger
+import sys 
+
+_logger = Logger('utils.reflect')
+
 
 def haveAttr(obj:any, attr:str)->bool:
     if obj is None:
@@ -136,5 +143,64 @@ def dict2obj(obj: object, d: dict) -> object:
     for k, v in d.items():
         if hasattr(obj, k):
             setattr(obj, k, v)
-    return obj
+    return obj    
+
+def import_lib(base):
+    _logger.INFO(f'import_lib-->加载包{base}')
+    return importlib.import_module(base)
+
+def loadlib_by_path(path: str) -> List:
+    """
+    按 uvicorn 风格字符串加载包/模块
+    返回 [模块对象, ...]
+    """
+    # 1. 解析模式
+    if path.endswith('.**'):
+        base, recursive = path[:-3], True
+    elif path.endswith('.*'):
+        base, recursive = path[:-2], False
+    else:
+        base, recursive = path, None
+
+    # 3. 加载根
+    root_mod = import_lib(base)
+    _logger.DEBUG(f'{dir(root_mod)}')
+    loaded = [base]
+
+    if recursive is None:               # 仅单个模块
+        return loaded
+
+    if not hasattr(root_mod, '__path__'):
+        raise ValueError(f'{base} 不是包，无法使用 * / **')
+
+    # 4. 手动递归
+    def walk(path, prefix):
+        for _, name, ispkg in pkgutil.iter_modules(path):
+            full_name = prefix + name
+            import_lib(full_name)
+            loaded.append(full_name)
+            if recursive and ispkg:          # ** 模式才继续深入
+                sub = import_lib(full_name)
+                walk(sub.__path__, full_name + '.')
+
+    walk(root_mod.__path__, base + '.')
+    return loaded
+
+# ------------------- demo -------------------
+if __name__ == '__main__':
+    
+    path = "dataflow.main"
+    if len(sys.argv) >=2:
+        path = sys.argv[1]
+    # 1. 仅加载模块
+    # print(loader.load("dataflow"))
+
+    # 2. 加载 db + 第一级子模块/子包
+    # print(loader.load("dataflow.*"))
+
+    # 3. 加载 db + 全部递归子模块
+    # print(loader.load("dataflow.**"))
+    print(f'========== {path}')
+    print(loadlib_by_path(path))
+    
     

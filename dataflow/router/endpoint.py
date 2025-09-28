@@ -12,9 +12,10 @@ from dataflow.utils.dbtools.mysql import initMysqlWithYaml
 from dataflow.utils.dbtools.redis import initRedisWithYaml
 from dataflow.utils.dbtools.milvus import initMilvusWithYaml
 from dataflow.utils.log import Logger
-from dataflow.utils.web.asgi import get_ipaddr, filter
+from dataflow.utils.web.asgi import get_ipaddr
 from dataflow.utils.config import settings
 from dataflow.module.context.metrics import setup_metrics 
+from dataflow.module.context.web import filter
 
 _logger = Logger('endpoint')
 
@@ -32,6 +33,8 @@ async def lifespan(app: FastAPI):
     _logger.INFO(f'MYSQLDS={settings.getDict('MYSQLDS')}')
     _logger.INFO(f'REDIS={settings.getDict('REDIS')}')
     _logger.INFO(f'MILVUS={settings.getDict('MILVUS')}')
+    
+    
     
     yield
     # 关闭时执行的代码

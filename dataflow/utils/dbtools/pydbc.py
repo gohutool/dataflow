@@ -93,7 +93,7 @@ class PydbcTools:
     #         raise e
     
     def queryMany(self, sql, params:dict=None):
-        _logger.INFO(f"[SQL]:{sql}")
+        _logger.DEBUG(f"[SQL]:{sql}")
         _logger.DEBUG(f"[Parameter]:{params}")
         try:
             with self.engine.begin() as connection:
