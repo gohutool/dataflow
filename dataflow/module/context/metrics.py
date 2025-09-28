@@ -82,7 +82,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
     """Middleware for tracking HTTP request metrics."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)                
-        _logger.INFO('初始化MetricsMiddleware过滤器')
+        _logger.INFO('创建过滤器MetricsMiddleware')
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Track metrics for each request.

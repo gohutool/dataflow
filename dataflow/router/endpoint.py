@@ -14,7 +14,6 @@ from dataflow.module.context.web import filter
 from dataflow.module import Context
 from dataflow.utils.reflect import is_not_primitive
 from dataflow.utils.utils import json_to_str
-# from datetime import datetime,date
 
 
 _logger = Logger('router.endpoint')
@@ -29,12 +28,6 @@ async def lifespan(app: FastAPI):
     # 关闭时执行的代码
     _logger.INFO("Application shutdown")
 
-
-# class CustomJSONEncoder(json.JSONEncoder):
-#     def default(self, obj):
-#         if isinstance(obj, (datetime, date)):
-#             return obj.strftime("%Y-%m-%d %H:%M:%S")  # 自定义格式
-#         return super().default(obj)
 
 class CustomJSONResponse(JSONResponse):
     def render(self, content):
