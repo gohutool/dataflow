@@ -4,6 +4,9 @@ from fastapi import FastAPI
 from typing import Callable
 from functools import wraps
 from dataflow.utils.config import YamlConfigation 
+from dataflow.utils.dbtools.pydbc import PydbcTools
+from dataflow.utils.dbtools.redis import initRedisWithConfig
+from dataflow.utils.dbtools.milvus import initMilvusWithConfig
 
 _logger = Logger('module.context')
 
@@ -21,6 +24,7 @@ class Context:
         _contextContainer._context = Context(applicationConfig_file, scan_path)        
         _logger.INFO(f'实例化容器={_contextContainer._context}')
         loadlib_by_path(_contextContainer._context.scan_path)
+        _contextContainer._context._parseContext()
         
     def __init__(self, applicationConfig_file:str, scan_path:str):
         self._CONTEXT = {}     
@@ -37,12 +41,41 @@ class Context:
     
     def _parseContext(self):
         self._init_datasource_context()
+        self._init_redis_context()
+        self._init_milvus_context()
         pass
     
     def _init_datasource_context(self):
-        if self._application_config.getConfig(''):
-            pass
-        pass
+        prefix = 'context.database'
+        c = self._application_config.getConfig(prefix)
+        if c:
+            for k, v in c.items():                
+                pt = PydbcTools(**v)
+                self.registerBean(f'{prefix}.{k}', pt)
+                _logger.INFO(f'初始化数据源{prefix}.{k}[{v}]={pt}')
+        else:
+            _logger.INFO('没有配置数据源，跳过初始化')
+            
+    def _init_redis_context(self):
+        prefix = 'context.redis'
+        c = self._application_config.getConfig(prefix)
+        if c:
+            r = initRedisWithConfig(c)            
+            self.registerBean(f'{prefix}', r)
+            _logger.INFO(f'初始化Redis源{prefix}[{c}]={r}')
+        else:
+            _logger.INFO('没有配置Redis源，跳过初始化')
+            
+    def _init_milvus_context(self):
+        prefix = 'context.milvus'
+        c = self._application_config.getConfig(prefix)
+        if c:
+            r = initMilvusWithConfig(c)
+            self.registerBean(f'{prefix}', r)
+            _logger.INFO(f'初始化Milvus源{prefix}[{c}]={r}')
+        else:
+            _logger.INFO('没有配置Milvus源，跳过初始化')
+        
     
     @staticmethod
     def Context(*,app:FastAPI, application_yaml:str='conf/application.yaml', scan:str='dataflow.application'):

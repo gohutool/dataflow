@@ -8,17 +8,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi import status
 from contextlib import asynccontextmanager
-from dataflow.utils.dbtools.mysql import initMysqlWithYaml
-from dataflow.utils.dbtools.redis import initRedisWithYaml
-from dataflow.utils.dbtools.milvus import initMilvusWithYaml
 from dataflow.utils.log import Logger
 from dataflow.utils.web.asgi import get_ipaddr
-from dataflow.utils.config import settings
 from dataflow.module.context.metrics import setup_metrics 
 from dataflow.module.context.web import filter
-from dataflow.module.context import WebContext, Context
+from dataflow.module.context import Context
 
-_logger = Logger('endpoint')
+_logger = Logger('router.endpoint')
 
 # 定义 lifespan 上下文管理器
 @asynccontextmanager
@@ -26,43 +22,10 @@ async def lifespan(app: FastAPI):
     # 启动时执行的代码
     _logger.INFO("Application startup")
     
-    initMysqlWithYaml('conf/db.yaml')
-    initRedisWithYaml('conf/redis.yaml')
-    initMilvusWithYaml('conf/milvus.yaml')
-    
-    _logger.INFO(f'DS={settings.getList('DataSource')}')
-    _logger.INFO(f'MYSQLDS={settings.getDict('MYSQLDS')}')
-    _logger.INFO(f'REDIS={settings.getDict('REDIS')}')
-    _logger.INFO(f'MILVUS={settings.getDict('MILVUS')}')
-    
-    
     yield
     # 关闭时执行的代码
     _logger.INFO("Application shutdown")
     
-
-# 基础全局依赖：验证 API Key
-# 这种方式针对Router方式，其他方式不拦截
-# 中间件拦截所有请求，根据
-# async def verify_api_key(request: Request):
-#     api_key = request.headers.get("X-API-Key")
-#     print(f'api_key={api_key}')    
-#     if not api_key:
-#         raise HTTPException(status_code=401, detail="API Key missing")
-#     # 简单的验证逻辑（实际应用中应该更复杂）
-#     if api_key != "your-secret-api-key":
-#         raise HTTPException(status_code=403, detail="Invalid API Key")    
-#     # # 验证通过，可以继续
-#     # return {"api_key": api_key}
-    
-
-# # 创建一个 FastAPI 应用实例
-# app = FastAPI(lifespan=lifespan,
-#               title="DataFlow API",
-#               version="1.0.0",
-#               dependencies=[Depends()]
-#             )   
-
 app = FastAPI(lifespan=lifespan,
               title="DataFlow API",
               version="1.0.0")
@@ -81,7 +44,8 @@ def initApp(app:FastAPI):
             
         response = await call_next(request)
         _logger.INFO(f"[{rid}] {request.method} {request.url}")        
-        return response
+        return response    
+    _logger.DEBUG(f'创建过滤器装饰器={authcheck_handler}')
 
     @app.middleware("http")
     async def xid_handler(request: Request, call_next):
@@ -91,7 +55,8 @@ def initApp(app:FastAPI):
         
         response = await call_next(request)
         response.headers["X-Request-ID"] = rid
-        return response
+        return response        
+    _logger.DEBUG(f'创建过滤器装饰器={xid_handler}')
     
     @filter(app, excludes='/test,/test/**')
     async def costtime_handler(request: Request, call_next):
@@ -122,6 +87,7 @@ def initApp(app:FastAPI):
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    _logger.DEBUG(f'创建过滤器装饰器={CORSMiddleware}')
 
     @app.get("/test")
     async def test_endpoint():
@@ -130,7 +96,7 @@ def initApp(app:FastAPI):
             status_code=status.HTTP_200_OK, 
             content={"message": "测试中间件顺序"}
         )
-        # return {"message": "测试中间件顺序"}
+        # return {"message": "测试中间件顺序"}            
         
 
 initApp(app=app)    

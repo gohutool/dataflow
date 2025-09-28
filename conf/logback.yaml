@@ -50,6 +50,10 @@ loggers:
     level: DEBUG
     handlers: [console, file]
     propagate: False
+  router:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: False
   uvicorn:
     level: INFO
     handlers: [console, file]

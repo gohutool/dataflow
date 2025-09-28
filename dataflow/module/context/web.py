@@ -18,19 +18,30 @@ antmatcher = AntPathMatcher()
 # "/users/{user_id}/posts/{post_id}", "/users/123/posts/456"
 # )
 # print(variables) # 输出: {'user_id': '123', 'post_id': '456'}
-def filter(app:FastAPI, *, path:str='*', excludes:str=None):
+def filter(app:FastAPI, *, path:list[str]|str='*', excludes:list[str]|str=None):
     
     paths = None
-    if str_isEmpty(path) or path.strip() == '*':
-        paths = None
+    if isinstance(path, list):
+        paths = []
+        for o in path:
+            paths.append(o.strip())
     else:
-        paths = str_strip(path).split(',')
+        if str_isEmpty(path) or path.strip() == '*':
+            paths = None
+        else:
+            paths = str_strip(path).split(',')
         
     _excludes = None
-    if str_isEmpty(excludes):
-        _excludes = None
+    if isinstance(excludes, list):
+        _excludes = []
+        
+        for o in excludes:
+            _excludes.append(o.strip())
     else:
-        _excludes = str_strip(excludes).split(',')
+        if str_isEmpty(excludes):
+            _excludes = None
+        else:
+            _excludes = str_strip(excludes).split(',')
         
     def decorator(func: Callable) -> Callable:
         if (paths is None or len(paths) == 0) and (_excludes is None or len(_excludes) == 0):
@@ -57,7 +68,7 @@ def filter(app:FastAPI, *, path:str='*', excludes:str=None):
                     _logger.DEBUG(f'{request.url.path}被拦截器拦截')
                     return await func(request, call_next)
             app.add_middleware(BaseHTTPMiddleware, dispatch=new_func)      
-    _logger.DEBUG(f'创建过滤器装饰器={decorator}')
+    _logger.DEBUG(f'创建过滤器装饰器={decorator} path={path} excludes={excludes}')
     return decorator
 
 

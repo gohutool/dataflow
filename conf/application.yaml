@@ -22,6 +22,34 @@ features:
   api_url: "https://api.${server.host}:${server.port}/v1"
 
 context:
+  database:
+    ds01:
+      url: ${env:MYSQLDS.url:mysql+pymysql://u:p@localhost:61306/stock_agent?charset%20utf8mb4}
+      # url: ${env:MYSQLDS.url:mysql+pymysql://u:p@localhost:61306/stock_agent?charset=utf8mb4}
+      username: ${env:MYSQLDS.user:stock_agent}
+      password: ${env:MYSQLDS.password:1qaz2wsx}
+      test: select 1
+    ds02:
+      url: ${env:ORACLEDS.url:oracle+oracledb://u:p@localhost:60521/?service_name%20ORCL}
+      username: ${env:ORACLEDS.user:stock_agent}
+      password: ${env:ORACLEDS.password:1qaz2wsx}         
+      test: select 1 from dual
+    ds03:
+      url: ${env:PGDS.url:postgresql+psycopg2://u:p@pgvector.ginghan.com:29432/aiproxy}
+      username: ${env:PGDS.user:postgres}
+      password: ${env:PGDS.password:aiproxy}
+      test: select 1
+  redis:
+    host: ${env:REDIS.host:localhost}
+    port: ${env:REDIS.port:60379}
+    db: ${env:REDIS.db:14}
+    password: ${env:REDIS.password:12345678}
+  milvus:
+    uri: ${env:MILVUS.uri:https://milvus.ginghan.com}  
+    user: ${env:MILVUS.user:}
+    password: ${env:MILVUS.password:}
+    timeout: ${env:MILVUS.timeout:}
+    token: ${env:MILVUS.token:}
   test:
     web:
       title: DataFlow

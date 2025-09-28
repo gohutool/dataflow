@@ -171,6 +171,7 @@ def ___resolve_custom_env_var(interpolation_str):
     首先检查环境变量VAR_NAME，若存在则使用其值，否则使用default_value。
     """
     # 分割字符串，获取环境变量名和默认值    
+    # print(interpolation_str)
     if ':' in interpolation_str:
         var_name, default_value = interpolation_str.split(':', 1)
     else:
