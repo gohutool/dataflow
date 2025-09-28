@@ -302,63 +302,6 @@ def str2Num(s, dv=None):
     except Exception as e:    
         raise e
 
-if __name__ == '__main__':
-    print(str2datestr_yyyymmddhhmmsss('2024-01-12 00:00:00.0')) 
-    txt = '\\u5e7f\\u4e1c\\u7701\\u6df1\\u5733\\u5e02\\u5b9d\\u5b89\\u533a\\u77f3\\u5ca9\\u8857\\u9053\\u6c34\\u7530\\u77f3\\u9f99\\u5927\\u905326\\u53f7'   
-    # txt = '%u7701%u4EFD%23'
-    print(utf8_urldecode(txt))
-    txt = '%23%u5DF4%u5F66%u6DD6%u5C14%u5E02%u5965%u9686%u5DE5%u7A0B%u5EFA%u8BBE%u6709%u9650%u516C%u53F8'   
-    # txt = '%u7701%u4EFD%23'
-    print(utf8_urldecode(txt))
-    # 要编码的URL
-    # encoded_string = '%3Ch3%3E%u4EBA%u5747%u4E8C%u6C27%u5316%u78B3'
-
-    # decoded_string = parse.unquote(encoded_string,'unicode_escape')
-    # print(decoded_string)
-    
-    # print(parse.quote('中文','unicode_escape'))
-    # print(decode_unicode_string('%u7701%u4EFD%23'))
-    
-    # s = "陕中"  
-    # encoded_s = parse.quote(s.replace("%u", "%%u"))  
-    # print(encoded_s)
-    
-    # s = "Hello, world中国!"  
-    # unicode_s = s.encode("unicode_escape")  
-    # print(unicode_s)
-    
-    
-    
-    # s = "Hello, world中国!"  
-    # unicode_s = s.encode("unicode_escape")  
-    # print(unicode_s)
-    
-  
-    # encoded_url = "%u7701%%u4EFD%23"  
-    # decoded_url = parse.unquote(encoded_url)  
-    # print(decoded_url)
-    
-    # aa = '\\u5e7f\\u4e1c\\u7701\\u6df1\\u5733\\u5e02\\u5b9d\\u5b89\\u533a\\u77f3\\u5ca9\\u8857\\u9053\\u6c34\\u7530\\u77f3\\u9f99\\u5927\\u905326\\u53f7'
-    # print(aa.encode('utf-8').decode("unicode_escape"))
-    
-    # #解码
-    # escape_str = '%23%u5DF4%u5F66%u6DD6%u5C14%u5E02%u5965%u9686%u5DE5%u7A0B%u5EFA%u8BBE%u6709%u9650%u516C%u53F8'
-    # str1 = escape_str.replace('%u', '\\u')
-    # str = str1.encode('utf-8').decode('unicode_escape')
-    # print(str)
-    
-    # escape_str = '%23%u5DF4%u5F66%u6DD6%u5C14%u5E02%u5965%u9686%u5DE5%u7A0B%u5EFA%u8BBE%u6709%u9650%u516C%u53F8'  
-    # str1 = escape_str.replace('%u', '\\u').encode('utf-8').decode('unicode_escape')  
-    # print(str1)
-    # print(utf8_urldecode(escape_str))
-
-    # #编码
-    # escape_str = '巴彦淖尔市奥隆工程建设有限公司'
-    # #decode()解码
-    # l = escape_str.encode('unicode_escape').decode("utf-8")
-    # s = l.replace('\\u', '%u')
-    # print(s)
-
 def str_is_text_include_checkstr_in_checklist(txt:str, checks:list[str])->bool:  
     if txt is None or len(txt.strip()) == 0:
         return False
@@ -599,3 +542,62 @@ class ReponseVO:
         定义对象的字符串表示。
         """
         return (f"ReponseVO(status={self.status}, msg={self.msg}, data={self.data}")
+    
+if __name__ == "__main__":
+    print(json_to_str(date_datetime_cn()))
+    
+    print(str2datestr_yyyymmddhhmmsss('2024-01-12 00:00:00.0')) 
+    txt = '\\u5e7f\\u4e1c\\u7701\\u6df1\\u5733\\u5e02\\u5b9d\\u5b89\\u533a\\u77f3\\u5ca9\\u8857\\u9053\\u6c34\\u7530\\u77f3\\u9f99\\u5927\\u905326\\u53f7'   
+    # txt = '%u7701%u4EFD%23'
+    print(utf8_urldecode(txt))
+    txt = '%23%u5DF4%u5F66%u6DD6%u5C14%u5E02%u5965%u9686%u5DE5%u7A0B%u5EFA%u8BBE%u6709%u9650%u516C%u53F8'   
+    # txt = '%u7701%u4EFD%23'
+    print(utf8_urldecode(txt))
+    # 要编码的URL
+    # encoded_string = '%3Ch3%3E%u4EBA%u5747%u4E8C%u6C27%u5316%u78B3'
+
+    # decoded_string = parse.unquote(encoded_string,'unicode_escape')
+    # print(decoded_string)
+    
+    # print(parse.quote('中文','unicode_escape'))
+    # print(decode_unicode_string('%u7701%u4EFD%23'))
+    
+    # s = "陕中"  
+    # encoded_s = parse.quote(s.replace("%u", "%%u"))  
+    # print(encoded_s)
+    
+    # s = "Hello, world中国!"  
+    # unicode_s = s.encode("unicode_escape")  
+    # print(unicode_s)
+    
+    
+    
+    # s = "Hello, world中国!"  
+    # unicode_s = s.encode("unicode_escape")  
+    # print(unicode_s)
+    
+  
+    # encoded_url = "%u7701%%u4EFD%23"  
+    # decoded_url = parse.unquote(encoded_url)  
+    # print(decoded_url)
+    
+    # aa = '\\u5e7f\\u4e1c\\u7701\\u6df1\\u5733\\u5e02\\u5b9d\\u5b89\\u533a\\u77f3\\u5ca9\\u8857\\u9053\\u6c34\\u7530\\u77f3\\u9f99\\u5927\\u905326\\u53f7'
+    # print(aa.encode('utf-8').decode("unicode_escape"))
+    
+    # #解码
+    # escape_str = '%23%u5DF4%u5F66%u6DD6%u5C14%u5E02%u5965%u9686%u5DE5%u7A0B%u5EFA%u8BBE%u6709%u9650%u516C%u53F8'
+    # str1 = escape_str.replace('%u', '\\u')
+    # str = str1.encode('utf-8').decode('unicode_escape')
+    # print(str)
+    
+    # escape_str = '%23%u5DF4%u5F66%u6DD6%u5C14%u5E02%u5965%u9686%u5DE5%u7A0B%u5EFA%u8BBE%u6709%u9650%u516C%u53F8'  
+    # str1 = escape_str.replace('%u', '\\u').encode('utf-8').decode('unicode_escape')  
+    # print(str1)
+    # print(utf8_urldecode(escape_str))
+
+    # #编码
+    # escape_str = '巴彦淖尔市奥隆工程建设有限公司'
+    # #decode()解码
+    # l = escape_str.encode('unicode_escape').decode("utf-8")
+    # s = l.replace('\\u', '%u')
+    # print(s)

@@ -13,10 +13,11 @@ from dataflow.utils.web.asgi import get_ipaddr
 from dataflow.module.context.metrics import setup_metrics 
 from dataflow.module.context.web import filter
 from dataflow.module import Context
-from typing import Any
-from datetime import datetime, date
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
+from dataflow.utils.reflect import is_not_primitive
+from dataflow.utils.utils import json_to_str
+# from datetime import datetime,date
+import json
+
 
 _logger = Logger('router.endpoint')
 
@@ -29,22 +30,23 @@ async def lifespan(app: FastAPI):
     yield
     # 关闭时执行的代码
     _logger.INFO("Application shutdown")
-    
 
-def custom_jsonable_encoder(obj: Any) -> Any:
-    if isinstance(obj, (datetime, date)):
-        return obj.strftime("%Y-%m-%d %H:%M:%S")
-    # 可以继续添加其他类型的处理
-    return jsonable_encoder(obj)
+
+# class CustomJSONEncoder(json.JSONEncoder):
+#     def default(self, obj):
+#         if isinstance(obj, (datetime, date)):
+#             return obj.strftime("%Y-%m-%d %H:%M:%S")  # 自定义格式
+#         return super().default(obj)
 
 class CustomJSONResponse(JSONResponse):
-    def render(self, content: Any) -> bytes:
-        content = custom_jsonable_encoder(content)
-        return super().render(content)    
+    def render(self, content):
+        if is_not_primitive(content):
+            return json_to_str(content).encode("utf-8")
+        return super().render(content)
     
 app = FastAPI(lifespan=lifespan,
-              title="DataFlow API",
-              default_response_class=CustomJSONResponse,
+              title="DataFlow API",  
+              default_response_class=CustomJSONResponse,            
               version="1.0.0")
  
 @Context.Context(app=app, scan='dataflow.application.**')
