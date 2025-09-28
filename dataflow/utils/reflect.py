@@ -178,10 +178,10 @@ def loadlib_by_path(path: str) -> List:
     def walk(path, prefix):
         for _, name, ispkg in pkgutil.iter_modules(path):
             full_name = prefix + name
-            import_lib(full_name)
+            sub = import_lib(full_name)
             loaded.append((full_name, ispkg))
             if recursive and ispkg:          # ** 模式才继续深入
-                sub = import_lib(full_name)
+                # import_lib(full_name)
                 walk(sub.__path__, full_name + '.')
 
     walk(root_mod.__path__, base + '.')

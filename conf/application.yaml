@@ -20,3 +20,16 @@ database:
 features:
   enabled: true
   api_url: "https://api.${server.host}:${server.port}/v1"
+
+context:
+  test:
+    web:
+      title: DataFlow
+      root: ./
+      num: 100
+      types:
+        - xls
+        - xlsx
+        - docs
+        - doc
+        - pdf

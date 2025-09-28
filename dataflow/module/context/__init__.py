@@ -3,6 +3,7 @@ from dataflow.utils.reflect import loadlib_by_path
 from fastapi import FastAPI
 from typing import Callable
 from functools import wraps
+from dataflow.utils.config import YamlConfigation 
 
 _logger = Logger('module.context')
 
@@ -17,17 +18,16 @@ class Context:
     
     @staticmethod
     def initContext(applicationConfig_file:str, scan_path:str):
-        _contextContainer._context = Context(applicationConfig_file, scan_path)
+        _contextContainer._context = Context(applicationConfig_file, scan_path)        
+        _logger.INFO(f'实例化容器={_contextContainer._context}')
+        loadlib_by_path(_contextContainer._context.scan_path)
         
     def __init__(self, applicationConfig_file:str, scan_path:str):
         self._CONTEXT = {}     
         self.appcaltion_file=applicationConfig_file
         self.scan_path = scan_path
-        
-        _logger.INFO(f'实例化容器={applicationConfig_file},{scan_path}')
-        loadlib_by_path(self.scan_path)
-        
-        pass
+        self._application_config:YamlConfigation = YamlConfigation.loadConfiguration(self.appcaltion_file)        
+        _logger.INFO(f'实例化容器={applicationConfig_file},{scan_path}')                
     
     def registerBean(self, service_name, service):
         self._CONTEXT[service_name] = service
@@ -40,12 +40,15 @@ class Context:
         pass
     
     def _init_datasource_context(self):
+        if self._application_config.getConfig(''):
+            pass
         pass
     
     @staticmethod
     def Context(*,app:FastAPI, application_yaml:str='conf/application.yaml', scan:str='dataflow.application'):
         if _contextContainer._webcontext is None:
             WebContext.initContext(app)
+            
         if _contextContainer._context is None:
             Context.initContext(application_yaml, scan)  
             _logger.WARN('Context启动成功')                        
@@ -56,6 +59,26 @@ class Context:
             @wraps(func)
             def wrapper(*args, **kwargs):                
                 result = func(*args, **kwargs)                
+                return result
+            return wrapper
+        return decorator
+    
+    @staticmethod    
+    def Configurationable(*, prefix:str):
+        c:YamlConfigation = Context.getContext()._application_config
+        config = c.getConfig(prefix)        
+        def decorator(func: Callable) -> Callable:
+            @wraps(func)
+            def wrapper(*args, **kwargs):                
+                if config is not None:
+                    if kwargs is None:
+                        kwargs = {}
+                    kwargs['config'] = config
+                    result = func(*args, **kwargs)
+                else:
+                    _logger.WARN(f'{prefix}没有对应值，配置函数只能进行配置相关操作，跳过')
+                    result = None
+                    #result = func(*args, **kwargs)
                 return result
             return wrapper
         return decorator

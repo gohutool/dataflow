@@ -211,7 +211,7 @@ class YamlConfigation:
         # OmegaConf.resolve(c)
         self.__config = OmegaConf.to_container(c, resolve=True)
         
-    def getConfig(self, prefix:str=None)->dict:
+    def getConfig(self, prefix:str=None)->any:
         c = self.__config
         if str_isEmpty(prefix):
             return c
