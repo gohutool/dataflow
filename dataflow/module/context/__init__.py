@@ -1,12 +1,14 @@
 from dataflow.utils.log import Logger
+from dataflow.utils.utils import str_isEmpty
 from dataflow.utils.reflect import loadlib_by_path
 from fastapi import FastAPI
 from typing import Callable
 from functools import wraps
 from dataflow.utils.config import YamlConfigation 
 from dataflow.utils.dbtools.pydbc import PydbcTools
-from dataflow.utils.dbtools.redis import initRedisWithConfig
-from dataflow.utils.dbtools.milvus import initMilvusWithConfig
+from dataflow.utils.dbtools.redis import initRedisWithConfig,RedisTools
+from dataflow.utils.dbtools.milvus import initMilvusWithConfig,MilvusTools
+
 
 _logger = Logger('module.context')
 
@@ -49,10 +51,15 @@ class Context:
         prefix = 'context.database'
         c = self._application_config.getConfig(prefix)
         if c:
+            default_ok:bool = False
             for k, v in c.items():                
                 pt = PydbcTools(**v)
                 self.registerBean(f'{prefix}.{k}', pt)
                 _logger.INFO(f'初始化数据源{prefix}.{k}[{v}]={pt}')
+                if not default_ok:
+                    self.registerBean(f'{prefix}.default', pt)
+                    default_ok = True
+                    _logger.INFO(f'设置默认数据源={pt}')
         else:
             _logger.INFO('没有配置数据源，跳过初始化')
             
@@ -75,7 +82,20 @@ class Context:
             _logger.INFO(f'初始化Milvus源{prefix}[{c}]={r}')
         else:
             _logger.INFO('没有配置Milvus源，跳过初始化')
-        
+    
+    def getRedisTools(self)->RedisTools:
+        prefix = 'context.redis'
+        return self.getBean(prefix)
+    
+    def getMilvusTools(self)->MilvusTools:
+        prefix = 'context.milvus'
+        return self.getBean(prefix)
+    
+    def getDataSource(self, ds_name:str=None)->PydbcTools:
+        prefix = 'context.database'
+        if str_isEmpty(ds_name):
+            ds_name = 'default'            
+        return self.getBean(f'{prefix}.{ds_name}')
     
     @staticmethod
     def Context(*,app:FastAPI, application_yaml:str='conf/application.yaml', scan:str='dataflow.application'):
