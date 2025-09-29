@@ -11,6 +11,7 @@ from typing import Any, Optional
 import time
 import re
 import json
+from pydantic import BaseModel, ConfigDict
 
 # from pydantic import BaseModel, Field
 
@@ -240,11 +241,10 @@ class DateEncoder(json.JSONEncoder):
         elif isinstance(obj, date):
             # date转换
             return date2str_yyyymmddddmmss(obj)        
-        else:
-            if has_method(obj, 'dict'):
-                return obj.dict()
-                            
-            
+        # else:
+        #     if has_method(obj, 'dict'):
+        #         return obj.dict()
+                                        
         raise TypeError(f'Unknown type {type(obj)}')
 
 # # json.JSONEncoder.default = DateTimeEncoder().default
@@ -493,6 +493,13 @@ def build_market(code:str, market:str='SH'):
     
 #     return result
 
+class MyBase(BaseModel):
+    model_config = ConfigDict(
+        json_encoders={          # v1 语法，v2 也可用
+            datetime: lambda v: date2str_yyyymmddddmmss(v),
+            date: lambda v: date2str_yyyymmddddmmss(v)
+        }
+    )
 
 class PageResult:
     # total :int = Field(0, description="总条数")

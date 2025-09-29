@@ -9,6 +9,11 @@ from fastapi.responses import JSONResponse
 from dataflow.utils.reflect import is_not_primitive
 from dataflow.utils.utils import json_to_str
 
+from fastapi.encoders import jsonable_encoder as original_jsonable_encoder
+from dataflow.utils.utils import date2str_yyyymmddddmmss
+from datetime import datetime, date
+import fastapi.encoders
+
 _logger = Logger('utils.web.asgi')
 
 # 定义一个自定义装饰器
@@ -84,6 +89,30 @@ class CustomJSONResponse(JSONResponse):
         if is_not_primitive(content):
             return json_to_str(content).encode("utf-8")
         return super().render(content)
+    
+def Init_fastapi_jsonencoder_plus():
+    # 保存原始函数
+    _original_jsonable_encoder = original_jsonable_encoder
+
+    def custom_jsonable_encoder(obj, **kwargs):
+        """自定义的 jsonable_encoder，全局处理时间格式化"""
+        # 设置自定义编码器
+        custom_encoders = {
+            datetime: lambda x: date2str_yyyymmddddmmss(x),
+            date: lambda x: date2str_yyyymmddddmmss(x)
+        }
+        
+        # 合并用户可能传入的其他编码器
+        if 'custom_encoder' in kwargs:
+            custom_encoders.update(kwargs['custom_encoder'])
+        
+        # 使用合并后的编码器
+        kwargs['custom_encoder'] = custom_encoders
+        
+        return _original_jsonable_encoder(obj, **kwargs)
+
+    fastapi.encoders.jsonable_encoder = custom_jsonable_encoder
+    
 
 if __name__ == "__main__":
     matcher = AntPathMatcher()
