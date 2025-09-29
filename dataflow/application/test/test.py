@@ -2,10 +2,9 @@ from dataflow.utils.utils import current_millsecond
 from dataflow.utils.web.asgi import get_remote_address
 from dataflow.module import Context,WebContext
 from dataflow.utils.log import Logger
-from fastapi import FastAPI, Request, HTTPException, status # noqa: F401
-
+from fastapi import FastAPI, Request, status # noqa: F401
 from fastapi.responses import JSONResponse
-from dataflow.module.context.web import filter
+from dataflow.module.context.web import filter, limiter
 
 _logger = Logger('application.test')
 app:FastAPI = WebContext.getRoot()
@@ -17,9 +16,9 @@ def config_all(config):
 
 config_all()
 
-
 @app.get("/test")
-async def test_endpoint():
+@limiter(rule='1/minute')
+async def test_endpoint(request:Request):
     _logger.INFO('测试中间件顺序')
     return JSONResponse(
         status_code= status.HTTP_200_OK, 

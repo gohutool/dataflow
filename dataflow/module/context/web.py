@@ -80,7 +80,7 @@ def filter(app:FastAPI=None, *, path:list[str]|str='*', excludes:list[str]|str=N
     _logger.DEBUG(f'创建过滤器装饰器={decorator} path={path} excludes={excludes}')
     return decorator
 
-def _global_id(requset:Request):
+def _global_id(request:Request):
     return '_global_'
 
 _default_limit_rate = Context.getContext().getConfigContext().getList('context.limiter.default_limit_rate')
@@ -93,11 +93,12 @@ _limiters = {}
 _limiters['IP'] = _ip_limiter
 _limiters['GLOBAL'] = _global_limiter
 
-def limiter(rule:str, *, id:Callable|str):
-    if id is None:
-        id = 'global'
-    if isinstance(id, str):
-        if id.strip().upper()=='IP':
+def limiter(rule:str, *, key:Callable|str=None):
+    if key is None:
+        # key = 'ip'
+        key = 'global'
+    if isinstance(key, str):
+        if key.strip().upper()=='IP':
             _logger.DEBUG(f'使用默认访问IP限流器[{rule}]=>{_ip_limiter}')
             return _ip_limiter.limit(rule)
         else:
@@ -105,11 +106,11 @@ def limiter(rule:str, *, id:Callable|str):
             return _global_limiter.limit(rule)
     else:
         _limiter = None
-        key = str(id)        
+        key = str(key)        
         if key in _limiters:
             _limiter = _limiters[key]
         else:
-            _limiter = Limiter(key_func=id, default_limits=_default_limit_rate)
+            _limiter = Limiter(key_func=key, default_limits=_default_limit_rate)
             _limiters[key] = _limiter
         _logger.DEBUG(f'使用自定义访问限流器[{rule}]=>{_limiter}')
         return _limiter.limit(rule)
