@@ -241,9 +241,9 @@ class DateEncoder(json.JSONEncoder):
         elif isinstance(obj, date):
             # date转换
             return date2str_yyyymmddddmmss(obj)        
-        # else:
-        #     if has_method(obj, 'dict'):
-        #         return obj.dict()
+        else:
+            if has_method(obj, 'dict'):
+                return obj.dict()
                                         
         raise TypeError(f'Unknown type {type(obj)}')
 
