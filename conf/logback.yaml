@@ -62,10 +62,11 @@ loggers:
     level: INFO
     handlers: [console, file]
     propagate: False
-  # utils.dao:
-  #   level: INFO
-  #   handlers: [console, file]
-  #   propagate: False
+  application:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: False
+   
 root:
   level: INFO
   handlers: [console, file]

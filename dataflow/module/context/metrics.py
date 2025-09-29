@@ -76,8 +76,8 @@ def setup_metrics(app):
     app.add_route("/prometheus/metrics", metrics)
     _logger.INFO('Metrics组件加载成功')
     
-
-
+    
+    
 class MetricsMiddleware(BaseHTTPMiddleware):
     """Middleware for tracking HTTP request metrics."""
     def __init__(self, *args, **kwargs):

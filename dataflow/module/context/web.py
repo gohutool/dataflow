@@ -3,8 +3,12 @@ from typing import Callable
 from starlette.middleware.base import BaseHTTPMiddleware
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import str_isEmpty,str_strip
+from dataflow.utils.web.asgi import get_remote_address
+from dataflow.module import Context, WebContext
 from antpathmatcher import AntPathMatcher
 from fastapi import Request, FastAPI
+from slowapi import Limiter
+
 
 _logger = Logger('module.context.web')
 
@@ -18,7 +22,12 @@ antmatcher = AntPathMatcher()
 # "/users/{user_id}/posts/{post_id}", "/users/123/posts/456"
 # )
 # print(variables) # 输出: {'user_id': '123', 'post_id': '456'}
-def filter(app:FastAPI, *, path:list[str]|str='*', excludes:list[str]|str=None):
+_filter = []
+
+def filter(app:FastAPI=None, *, path:list[str]|str='*', excludes:list[str]|str=None, order=1):    
+    
+    if not app:
+        app = WebContext.getRoot()
     
     paths = None
     if isinstance(path, list):
@@ -45,7 +54,7 @@ def filter(app:FastAPI, *, path:list[str]|str='*', excludes:list[str]|str=None):
         
     def decorator(func: Callable) -> Callable:
         if (paths is None or len(paths) == 0) and (_excludes is None or len(_excludes) == 0):
-            app.add_middleware(BaseHTTPMiddleware, dispatch=func) 
+            app.add_middleware(BaseHTTPMiddleware, dispatch=func)
         else:
             async def new_func(request: Request, call_next):   
                 if _excludes is not None and len(_excludes)>0 :
@@ -71,6 +80,39 @@ def filter(app:FastAPI, *, path:list[str]|str='*', excludes:list[str]|str=None):
     _logger.DEBUG(f'创建过滤器装饰器={decorator} path={path} excludes={excludes}')
     return decorator
 
+def _global_id(requset:Request):
+    return '_global_'
+
+_default_limit_rate = Context.getContext().getConfigContext().getList('context.limiter.default_limit_rate')
+_default_limit_rate = _default_limit_rate if _default_limit_rate else ["200000/day", "50000/hour"]
+
+_ip_limiter = Limiter(key_func=get_remote_address, default_limits=_default_limit_rate)
+_global_limiter = Limiter(key_func=_global_id, default_limits=_default_limit_rate)
+
+_limiters = {}
+_limiters['IP'] = _ip_limiter
+_limiters['GLOBAL'] = _global_limiter
+
+def limiter(rule:str, *, id:Callable|str):
+    if id is None:
+        id = 'global'
+    if isinstance(id, str):
+        if id.strip().upper()=='IP':
+            _logger.DEBUG(f'使用默认访问IP限流器[{rule}]=>{_ip_limiter}')
+            return _ip_limiter.limit(rule)
+        else:
+            _logger.DEBUG(f'使用默认访问限流器[{rule}]=>{_global_limiter}')
+            return _global_limiter.limit(rule)
+    else:
+        _limiter = None
+        key = str(id)        
+        if key in _limiters:
+            _limiter = _limiters[key]
+        else:
+            _limiter = Limiter(key_func=id, default_limits=_default_limit_rate)
+            _limiters[key] = _limiter
+        _logger.DEBUG(f'使用自定义访问限流器[{rule}]=>{_limiter}')
+        return _limiter.limit(rule)
 
 if __name__ == "__main__":
     matcher = AntPathMatcher()

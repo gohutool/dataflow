@@ -22,6 +22,10 @@ features:
   api_url: "https://api.${server.host}:${server.port}/v1"
 
 context:
+  limiter:
+    default_limit_rate:
+      - 200000/day
+      - 50/hour
   database:
     ds01:
       url: ${env:MYSQLDS.url:mysql+pymysql://u:p@localhost:61306/stock_agent?charset%20utf8mb4}

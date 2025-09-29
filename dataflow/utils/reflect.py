@@ -148,6 +148,7 @@ def dict2obj(obj: object, d: dict) -> object:
 
 def import_lib(base):   
     start = current_millsecond()
+    _logger.INFO(f'import_lib-->加载包{base}开始')
     mod = importlib.import_module(base)
     cost = (current_millsecond() - start)
     _logger.INFO(f'import_lib-->加载包{base}[{"PKG" if hasattr(mod, '__path__') else "MOD" }] 耗时{cost:.2f}毫秒')

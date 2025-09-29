@@ -10,7 +10,56 @@ _logger = Logger('module.context')
 
 _logger.DEBUG('加载module.context')
 
-class Context:    
+_onloaded = []
+_onstarted = []
+_onexit = []
+_oninit = []
+
+_web_onloaded = []
+_web_onstarted = []
+
+
+class Context:
+    class Event:
+        @staticmethod        
+        def on_init(func):
+            _oninit.append(func)
+            _logger.DEBUG(f'on_init增加处理函数{func}')
+            
+        def on_loaded(func):
+            _onloaded.append(func)
+            _logger.DEBUG(f'on_loaded增加处理函数{func}')
+            
+        @staticmethod
+        def on_started(func):
+            _onstarted.append(func)
+            _logger.DEBUG(f'on_started增加处理函数{func}')
+            
+        @staticmethod
+        def on_exit(func):
+            _onexit.append(func)
+            _logger.DEBUG(f'on_exit增加处理函数{func}')
+            
+        def emit(event:str, *args, **kwargs):
+            """广播事件"""
+            _handlers = None
+            if not event :
+                event = 'loaded'
+            _logger.DEBUG(f'触发{event}开始')    
+            if event.strip().lower()=='loaded':
+                _handlers = _onloaded
+            elif event.strip().lower()=='started':
+                _handlers = _onstarted
+            elif event.strip().lower()=='exit':
+                _handlers = _onexit
+            elif event.strip().lower()=='init':
+                _handlers = _oninit
+            else:
+                return             
+            for f in _handlers:
+                f(*args, **kwargs)
+            _logger.DEBUG(f'触发{event}结束')
+        
     @staticmethod
     def getContext():
         if _contextContainer._context is None:
@@ -22,16 +71,20 @@ class Context:
         _contextContainer._context = Context(applicationConfig_file, scan_path)        
         _logger.INFO(f'实例化容器={_contextContainer._context}')
         _contextContainer._context._parseContext()
-        _logger.DEBUG(f'开始加载模块路径{scan_path}')
-        loadlib_by_path(_contextContainer._context.scan_path)
-        
+        _logger.DEBUG(f'加载模块路径{scan_path}开始')        
+        _modules = loadlib_by_path(_contextContainer._context.scan_path)
+        _logger.DEBUG(f'加载模块路径{scan_path}结束')        
+        Context.Event.emit('loaded', _contextContainer._context, _modules)
         
     def __init__(self, applicationConfig_file:str, scan_path:str):
         self._CONTEXT = {}     
         self.appcaltion_file=applicationConfig_file
         self.scan_path = scan_path
         self._application_config:YamlConfigation = YamlConfigation.loadConfiguration(self.appcaltion_file)        
-        _logger.INFO(f'实例化容器={applicationConfig_file},{scan_path}')                
+        _logger.INFO(f'实例化容器={applicationConfig_file},{scan_path}')    
+        
+    def getConfigContext(self)->YamlConfigation:
+        return self._application_config            
     
     def registerBean(self, service_name, service):
         self._CONTEXT[service_name] = service
@@ -41,21 +94,24 @@ class Context:
     
     def _parseContext(self):        
         module_path = 'dataflow.module.**'
-        _logger.DEBUG(f'开始加载内部模块路径{module_path}')
-        loadlib_by_path(module_path)
+        _logger.DEBUG(f'初始化内部模块路径{module_path}开始')
+        _modules = loadlib_by_path(module_path)
+        _logger.DEBUG(f'初始化内部模块路径{module_path}结束')
+        Context.Event.emit('init', self, _modules)
         pass
             
     @staticmethod
-    def Context(*,app:FastAPI, application_yaml:str='conf/application.yaml', scan:str='dataflow.application'):
-        if _contextContainer._webcontext is None:
-            WebContext.initContext(app)
+    def Context(*,app:FastAPI, application_yaml:str='conf/application.yaml', scan:str='dataflow.application'):                
+        if _contextContainer._webcontext is None:            
+            WebContext.initContext(app)         
             
         if _contextContainer._context is None:
-            Context.initContext(application_yaml, scan)  
-            _logger.WARN('Context启动成功')                        
+            Context.initContext(application_yaml, scan)              
         else:
-            _logger.WARN('Context已经启动')
+            _logger.WARN('Context已经启动')        
             
+        WebContext.Event.emit('loaded', app)
+                
         def decorator(func: Callable) -> Callable:
             @wraps(func)
             def wrapper(*args, **kwargs):                
@@ -86,7 +142,34 @@ class Context:
         
 
 
-class WebContext: 
+class WebContext:     
+    class Event:
+        @staticmethod
+        def on_loaded(func):
+            _web_onloaded.append(func)
+            _logger.DEBUG(f'on_loaded增加处理函数{func}')
+            
+        @staticmethod
+        def on_started(func):
+            _web_onstarted.append(func)
+            _logger.DEBUG(f'on_started增加处理函数{func}')
+            
+        def emit(event:str, *args, **kwargs):
+            """广播事件"""
+            _handlers = None
+            if not event :
+                event = 'loaded'
+            _logger.DEBUG(f'触发{event}开始')
+            if event.strip().lower()=='loaded':
+                _handlers = _web_onloaded
+            elif event.strip().lower()=='started':
+                _handlers = _web_onstarted            
+            else:
+                return             
+            for f in _handlers:
+                f(*args, **kwargs)
+            _logger.DEBUG(f'触发{event}结束')
+            
     @staticmethod
     def getContext():
         if _contextContainer._webcontext is None:
