@@ -2,6 +2,7 @@ from sqlalchemy import create_engine, Engine, text, event, make_url
 from sqlalchemy.pool import QueuePool
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import PageResult
+from dataflow.utils.utils import json_to_str
 
 _logger = Logger('utils.dbtools.pydbc')
 
@@ -241,7 +242,8 @@ if __name__ == "__main__":
     print(p)
     print(p.queryOne('select * from sa_security_realtime_daily limit 10'))
     print(p.queryPage('select * from sa_security_realtime_daily order by tradedate desc', None, page=1, pagesize=10))        
-    print(p.queryPage('select * from sa_security_realtime_daily where code=:code order by tradedate desc', {'code':'300492'}, page=1, pagesize=10))
+    t = p.queryPage('select * from sa_security_realtime_daily where code=:code order by tradedate desc', {'code':'300492'}, page=1, pagesize=10)
+    print(json_to_str(t))
     
     url = 'postgresql+psycopg2://u:p@pgvector.ginghan.com:29432/aiproxy'
     p = PydbcTools(url=url, username='postgres', password='aiproxy', test='select 1')

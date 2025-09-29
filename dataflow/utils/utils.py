@@ -7,10 +7,11 @@ import numpy as np
 import traceback
 import importlib
 import pytz
-import json
 from typing import Any, Optional
 import time
 import re
+import json
+
 # from pydantic import BaseModel, Field
 
 def date_datetime_cn(dt:datetime=None):
@@ -211,18 +212,51 @@ def dataframe_to_list(df:DataFrame)->List[dict]:
 
 
 # 一劳永逸
-def _datetime_converter(obj: object) -> str:
-    """
-    把 datetime / date 对象转成 ISO-8601 字符串
-    """    
-    if isinstance(obj, (datetime, datetime.date)):        
-        return date2str_yyyymmddddmmss(obj)
-    raise TypeError(f"Unsupported type: {type(obj)}")
+# def _datetime_converter(obj: object) -> str:
+#     """
+#     把 datetime / date 对象转成 ISO-8601 字符串
+#     """    
+#     if isinstance(obj, (datetime, date)):        
+#         return date2str_yyyymmddddmmss(obj)
+    
+    
+# json.JSONEncoder.default = staticmethod(_datetime_converter)
 
-json.JSONEncoder.default = staticmethod(_datetime_converter)
+# class DateTimeEncoder(json.JSONEncoder):
+#     """自定义 JSON 编码器，处理 datetime 和 date 对象"""
+#     def default(self, obj):
+#         if isinstance(obj, (datetime, date)):
+#             # 返回 ISO 格式字符串
+#             return obj.isoformat()
+#         # 对于其他类型，使用默认的序列化方法
+#         return super().default(obj)
+
+class DateEncoder(json.JSONEncoder):
+    def default(self, obj):
+        
+        if isinstance(obj, datetime):
+            # datetime转换
+            return date2str_yyyymmddddmmss(obj)
+        elif isinstance(obj, date):
+            # date转换
+            return date2str_yyyymmddddmmss(obj)        
+        else:
+            if has_method(obj, 'dict'):
+                return obj.dict()
+                            
+            
+        raise TypeError(f'Unknown type {type(obj)}')
+
+# # json.JSONEncoder.default = DateTimeEncoder().default
+
+def has_method(o, m):
+    return callable(getattr(o, m, None))
 
 def json_to_str(obj:any):
-    return json.dumps(obj, ensure_ascii=False, separators=(',', ':'))
+    return json.dumps(obj, ensure_ascii=False, separators=(',', ':'), cls=DateEncoder)
+    # if has_method(obj, 'dict'):
+    #     obj = obj.dict()        
+    # return orjson.dumps(obj).decode()
 
 def str_to_json(txt:str)->dict|list:
     return json.loads(txt)
@@ -356,7 +390,7 @@ def dataframe_get_rows_from_xls(filename:str)->tuple:
         return (stocks, bankuais)
     
 def obj_2_json_file(obj:any, filepath:str):
-    json_data = json.dumps(obj, indent=4, ensure_ascii=False)
+    json_data = json_to_str(obj)
         # 将 JSON 数据保存到文件，指定编码为 UTF-8
     with open(filepath, "w", encoding="utf-8") as file:
         file.write(json_data)
@@ -532,19 +566,32 @@ class ReponseVO:
     # status: bool = Field(True, description="响应状态")
     # msg: str = Field('成功', description="返回消息")
     # data: Any = Field(None, description="返回数据")
-    def __init__(self, status:bool=True, msg:str='成功', data:any=None): 
+    def __init__(self, status:bool=True, msg:str='成功', code:int=200, data:any=None): 
         self.status = status
         self.msg = msg
         self.data = data
+        self.code = code
+        
+        
+    
+    # ① 供 Pydantic 序列化
+    def dict(self) -> dict:
+        return {
+            "status": self.status,
+            "msg": self.msg,
+            "data": self.data,
+            "code": self.code,
+        }
         
     def __repr__(self):
         """
         定义对象的字符串表示。
         """
-        return (f"ReponseVO(status={self.status}, msg={self.msg}, data={self.data}")
+        return (f"ReponseVO(status={self.status}, code={self.code}, msg={self.msg}, data={self.data}")
     
 if __name__ == "__main__":
-    print(json_to_str(date_datetime_cn()))
+    t = date_datetime_cn()
+    print(f'{t}=={json_to_str(t)}')
     
     print(str2datestr_yyyymmddhhmmsss('2024-01-12 00:00:00.0')) 
     txt = '\\u5e7f\\u4e1c\\u7701\\u6df1\\u5733\\u5e02\\u5b9d\\u5b89\\u533a\\u77f3\\u5ca9\\u8857\\u9053\\u6c34\\u7530\\u77f3\\u9f99\\u5927\\u905326\\u53f7'   

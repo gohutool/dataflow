@@ -5,13 +5,11 @@ from dataflow.utils.utils import current_millsecond
 import uuid
 from dataflow.utils.web.asgi import custom_authcheck_decorator  # noqa: F401
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+
 from contextlib import asynccontextmanager
 from dataflow.utils.log import Logger
-from dataflow.utils.web.asgi import get_ipaddr
+from dataflow.utils.web.asgi import get_ipaddr, CustomJSONResponse
 from dataflow.module import Context, WebContext
-from dataflow.utils.reflect import is_not_primitive
-from dataflow.utils.utils import json_to_str
 
 
 _logger = Logger('router.endpoint')
@@ -28,12 +26,6 @@ async def lifespan(app: FastAPI):
     Context.Event.emit('exit')
     _logger.INFO("Application shutdown")
 
-
-class CustomJSONResponse(JSONResponse):
-    def render(self, content):
-        if is_not_primitive(content):
-            return json_to_str(content).encode("utf-8")
-        return super().render(content)
     
 app = FastAPI(lifespan=lifespan,
               title="DataFlow API",  

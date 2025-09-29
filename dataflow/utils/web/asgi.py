@@ -4,7 +4,10 @@ from typing import Callable
 from fastapi import Request, HTTPException
 from dataflow.utils.log import Logger
 from antpathmatcher import AntPathMatcher
+from fastapi.responses import JSONResponse
 
+from dataflow.utils.reflect import is_not_primitive
+from dataflow.utils.utils import json_to_str
 
 _logger = Logger('utils.web.asgi')
 
@@ -76,7 +79,11 @@ def get_remote_address(request: Request) -> str:
     # return request.client.host
     return get_ipaddr(request)
 
-
+class CustomJSONResponse(JSONResponse):
+    def render(self, content):
+        if is_not_primitive(content):
+            return json_to_str(content).encode("utf-8")
+        return super().render(content)
 
 if __name__ == "__main__":
     matcher = AntPathMatcher()

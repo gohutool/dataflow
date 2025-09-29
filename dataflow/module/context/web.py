@@ -2,12 +2,15 @@
 from typing import Callable
 from starlette.middleware.base import BaseHTTPMiddleware
 from dataflow.utils.log import Logger
-from dataflow.utils.utils import str_isEmpty,str_strip
-from dataflow.utils.web.asgi import get_remote_address
+from dataflow.utils.utils import str_isEmpty,str_strip, ReponseVO,json_to_str  # noqa: F401
+from dataflow.utils.web.asgi import get_remote_address, CustomJSONResponse
 from dataflow.module import Context, WebContext
 from antpathmatcher import AntPathMatcher
 from fastapi import Request, FastAPI
 from slowapi import Limiter
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
 _logger = Logger('module.context.web')
@@ -114,6 +117,28 @@ def limiter(rule:str, *, key:Callable|str=None):
             _limiters[key] = _limiter
         _logger.DEBUG(f'使用自定义访问限流器[{rule}]=>{_limiter}')
         return _limiter.limit(rule)
+
+
+@WebContext.Event.on_loaded
+def init_error_handler(app:FastAPI):
+    # 覆盖 HTTPException
+    @app.exception_handler(StarletteHTTPException)
+    async def http_exception_handler(request: Request, exc:StarletteHTTPException):
+        return CustomJSONResponse(
+            status_code=exc.status_code,
+            # content={"code": exc.status_code, "message": exc.detail}
+            content=ReponseVO(False, code=exc.status_code, msg=exc.detail, data=exc.detail)
+        )
+
+    # 覆盖校验错误
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc:RequestValidationError):
+        return CustomJSONResponse(
+            status_code=422,
+            # content={"code": 422, "message": "参数校验失败", "errors": exc.errors()}
+            content=ReponseVO(False, code=422, msg=exc.detail, data=exc.errors)
+        )
+
 
 if __name__ == "__main__":
     matcher = AntPathMatcher()
