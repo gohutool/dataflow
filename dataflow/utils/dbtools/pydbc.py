@@ -176,7 +176,13 @@ class PydbcTools:
 
     def delete(self, sql, params=None, commit=True):
         self.update(sql, params, commit)
+        
+    def insertT(self, tablename:str, params=None, commit=True):
+        pass
 
+    def updateT(self, tablename:str, params=None, commit=True):
+        pass
+    
     def batch(self, sql, paramsList:list[dict|tuple]=None, batchsize:int=100, commit=True):
         _logger.DEBUG(f"[SQL]:{sql}")
         _logger.DEBUG(f"[Parameters]:{paramsList}")

@@ -1,7 +1,6 @@
 from langfuse import Langfuse, observe
 from dataflow.utils.config import settings
 from dataflow.utils.log import Logger
-from langfuse.openai import openai  # 注意：从langfuse导入
 import functools
 from typing import Callable
 import atexit
@@ -12,7 +11,7 @@ import atexit
 # Get the default client
 # client = get_client()
 
-__logger = Logger('chain.langfuse')
+_logger = Logger('utils.trace.langfuse')
 
 class LangfusePlugin:    
     name:str = 'LangfusePlugin'    
@@ -28,20 +27,18 @@ class LangfusePlugin:
             else:
                 return func(*args, **kw)
         return wrapper 
-    
-print(f'{LangfusePlugin.name} {LangfusePlugin.observe}')
 
 
-def Setup_Langfuser()->Langfuse:
-    secret_key=settings.getStr("LANGFUSE_PUBLIC_KEY", "sk-lf-b60f4b33-ff5a-46ac-9086-e776373c86da")
-    public_key=settings.getStr("LANGFUSE_SECRET_KEY", "pk-lf-4172303b-f7c4-4dc0-9d77-184d99c06131")
-    host=settings.getStr("LANGFUSE_HOST", "https://us.cloud.langfuse.com")
+def Setup_Langfuser(secret_key, public_key, host)->Langfuse:
+    # secret_key=settings.getStr("LANGFUSE_PUBLIC_KEY", "sk-lf-b60f4b33-ff5a-46ac-9086-e776373c86da")
+    # public_key=settings.getStr("LANGFUSE_SECRET_KEY", "pk-lf-4172303b-f7c4-4dc0-9d77-184d99c06131")
+    # host=settings.getStr("LANGFUSE_HOST", "https://us.cloud.langfuse.com")
 
     # secret_key="sk-lf-32a7fc51-dad9-4977-950b-c00b9cf8c12b"
     # public_key="pk-lf-13e8d88d-4f15-4bba-bb3e-609c4095ed41"
     # host="https://us.cloud.langfuse.com"
 
-    print(f'public_key={public_key} secret_key={secret_key} host={host}')
+    _logger(f'public_key={public_key} secret_key={secret_key} host={host}')
         
     # Initialize Langfuse
     langfuse = Langfuse(
@@ -51,10 +48,11 @@ def Setup_Langfuser()->Langfuse:
     )
     
     LangfusePlugin.ENABLE_LANGFUSE = True
+    _logger.DEBUG(f'{LangfusePlugin.name} {LangfusePlugin.observe} {LangfusePlugin.ENABLE_LANGFUSE}')
     
     def on_exit():        
         langfuse.flush()
-        __logger.INFO('Langfuse清理缓存')
+        _logger.INFO('Langfuse清理缓存')
     
     atexit.register(on_exit)   
     return langfuse
