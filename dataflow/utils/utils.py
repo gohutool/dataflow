@@ -12,6 +12,7 @@ import time
 import re
 import json
 from pydantic import BaseModel, ConfigDict
+import decimal
 
 # from pydantic import BaseModel, Field
 
@@ -240,7 +241,9 @@ class DateEncoder(json.JSONEncoder):
             return date2str_yyyymmddddmmss(obj)
         elif isinstance(obj, date):
             # date转换
-            return date2str_yyyymmddddmmss(obj)        
+            return date2str_yyyymmddddmmss(obj)   
+        elif isinstance(obj, decimal.Decimal):
+            return float(obj)
         else:
             if has_method(obj, 'dict'):
                 return obj.dict()

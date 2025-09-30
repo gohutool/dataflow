@@ -4,8 +4,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import PageResult
 from dataflow.utils.utils import json_to_str
-from typing import Any, Dict
-from cachetools import TTLCache
+from typing import Any, Dict, Optional
+from cachetools import Cache
 
 _logger = Logger('utils.dbtools.pydbc')
 
@@ -50,7 +50,7 @@ def _setup_monitoring(engine:Engine):
 
 class PydbcTools:
     def __init__(self, **kwargs):
-        self._table_cache = TTLCache(maxsize=128, ttl=60)
+        self._table_cache = Cache(maxsize=10000000)
         self.__config__ = kwargs
         self.__url = make_url(
                 self.__config__['url']
@@ -187,6 +187,13 @@ class PydbcTools:
     def updateT(self, tablename:str, params=None, commit=True):
         pass
     
+     
+    def _find_auto_increment_column(self, columns_info: Dict[str, Any]) -> Optional[str]:
+        """查找自增长字段"""
+        for col_name, col_info in columns_info.items():
+            if col_info.get('autoincrement', False) and col_info.get('primary_key', False):
+                return col_name
+        return None
     
     def get_table_info(self, table_name: str, **kwargs) -> Dict[str, Any]:
         """获取表的字段信息"""
@@ -194,15 +201,10 @@ class PydbcTools:
         cache_key = f"{db_type}.{table_name}"
         
         if cache_key in self._table_cache:
-            return self.table_cache[cache_key]
+            return self._table_cache[cache_key]
         
-        engine = None
-        try:
-            if db_type in self.engines:
-                engine = self.engines[db_type]
-            else:
-                engine = self.connect(db_type, **kwargs)
-            
+        engine = self.engine
+        try:            
             # 使用 SQLAlchemy 的 inspect 功能获取表结构
             inspector = inspect(engine)
             
@@ -232,12 +234,12 @@ class PydbcTools:
             }
             
             # 缓存表信息
-            self.table_cache[cache_key] = table_info
+            self._table_cache[cache_key] = table_info
             return table_info
             
         except SQLAlchemyError as e:
             _logger.error(f"获取表结构失败: {e}")
-            return {}
+            raise e
     
     def batch(self, sql, paramsList:list[dict|tuple]=None, batchsize:int=100, commit=True):
         _logger.DEBUG(f"[SQL]:{sql}")
@@ -299,13 +301,15 @@ if __name__ == "__main__":
     url = url.set(password='123456')
     print(url)
     
-    url = 'mysql+pymysql://u:p@localhost:61306/stock_agent?charset=utf8mb4'
+    url = 'mysql+pymysql://u:p@localhost:61306/dataflow_test?charset=utf8mb4'
     p = PydbcTools(url=url, username='stock_agent', password='1qaz2wsx', test='select 1')
     print(p)
     # print(p.queryOne('select * from sa_security_realtime_daily limit 10'))
     # print(p.queryPage('select * from sa_security_realtime_daily order by tradedate desc', None, page=1, pagesize=10))        
     t = p.queryPage('select * from sa_security_realtime_daily where code=:code order by tradedate desc', {'code':'300492'}, page=1, pagesize=10)
     print(json_to_str(t))
+    
+    print(p.get_table_info('sa_security_realtime_daily'))
     
     url = 'postgresql+psycopg2://u:p@pgvector.ginghan.com:29432/aiproxy'
     p = PydbcTools(url=url, username='postgres', password='aiproxy', test='select 1')
@@ -325,6 +329,7 @@ if __name__ == "__main__":
     # print(p.queryPage("SELECT * FROM dba_registry where version like '%'||:version||'%' order by comp_id desc", {'version':'19'}, page=1, pagesize=10))
     t = p.queryPage("SELECT * FROM dba_registry where version like '%'||:version||'%' order by comp_id desc", {'version':'19'}, page=1, pagesize=10)
     print(json_to_str(t))
+    
     
     
     
