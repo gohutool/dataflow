@@ -717,15 +717,6 @@ class ReponseVO:
         定义对象的字符串表示。
         """
         return (f"ReponseVO(status={self.status}, code={self.code}, msg={self.msg}, data={self.data}")
-
-class NULLObj:
-    pass
-
-NULL = NULLObj()    
-
-def is_null(obj):
-    return NULL == obj
-
     
 if __name__ == "__main__":
     t = date_datetime_cn()

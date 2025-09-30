@@ -3,7 +3,7 @@ from sqlalchemy.pool import QueuePool
 from sqlalchemy.exc import SQLAlchemyError
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import PageResult
-from dataflow.utils.utils import json_to_str
+from dataflow.utils.utils import json_to_str, str_isEmpty
 from typing import Any, Dict, Optional
 from cachetools import Cache
 
@@ -48,6 +48,19 @@ def _setup_monitoring(engine:Engine):
     def on_soft_invalidate(dbapi_conn, connection_record, exception):
         _logger.DEBUG(f"⚠️ SOFT_INVALIDATE - 软失效: {id(dbapi_conn)}")
 
+INNER_PLACEHOLDER = '_$inner$_'
+INNER_UPDATE_PLACEHOLDER = '_update__'
+
+
+class _NULLObj:
+    pass
+
+NULL = _NULLObj()    
+
+def _is_null(obj):
+    return NULL == obj
+
+
 class PydbcTools:
     def __init__(self, **kwargs):
         self._table_cache = Cache(maxsize=10000000)
@@ -85,6 +98,8 @@ class PydbcTools:
     def getEnginee(self)->Engine:
         return self.engine
     
+    def getDbType(self)->str:
+        return self.engine.dialect.name.lower()
     # @overload
     # def queryMany(self, sql, params:tuple):
     #     _logger.DEBUG(f"[SQL]:{sql}")
@@ -144,16 +159,16 @@ class PydbcTools:
                 params['_offset_'] = offset
                 params['_pagesize_'] = pagesize
                 sql_wrap = sql + ' LIMIT :_pagesize_  OFFSET :_offset_ '
-                if self.engine.dialect.name == "postgresql": # ("postgresql", "mysql", "sqlite", "clickhouse", "openGauss", "dm", "kingbase")
+                if self.getDbType() == "postgresql": # ("postgresql", "mysql", "sqlite", "clickhouse", "openGauss", "dm", "kingbase")
                     sql_wrap = sql + ' LIMIT :_pagesize_  OFFSET :_offset_ '
-                elif self.engine.dialect.name == "mysql":
+                elif self.getDbType() == "mysql":
                     # sql_wrap = sql + ' LIMIT :_pagesize_  OFFSET :_offset_ '
                     sql_wrap = sql + ' LIMIT :_offset_, :_pagesize_  '
-                elif self.engine.dialect.name == "oracle":
+                elif self.getDbType() == "oracle":
                     sql_wrap = f'SELECT * FROM (SELECT t.*, ROWNUM rn FROM ({sql}) t) WHERE rn BETWEEN :_offset_ + 1 AND :_offset_ + :_pagesize_ '
-                elif self.engine.dialect.name == "mssql":
+                elif self.getDbType() == "mssql":
                     sql_wrap = sql + ' OFFSET :_offset_ ROWS FETCH NEXT :_pagesize_ ROWS ONLY'
-                elif self.engine.dialect.name == "hive":
+                elif self.getDbType() == "hive":
                     sql_wrap = f'SELECT * FROM (SELECT t.*, ROW_NUMBER() OVER (ORDER BY 1) AS rn FROM ({sql}) t) WHERE rn BETWEEN :_offset_ + 1 AND :_offset_ + :_pagesize_ '                                        
                     
                 
@@ -176,17 +191,189 @@ class PydbcTools:
                 raise e
             
     def insert(self, sql, params=None, commit=True):
-        self.update(sql, params, commit)
+        return self.update(sql, params, commit)
 
     def delete(self, sql, params=None, commit=True):
-        self.update(sql, params, commit)
+        return self.update(sql, params, commit)
         
-    def insertT(self, tablename:str, params=None, commit=True):
-        pass
+    def insertT(self, tablename:str, params:dict=None, commit=True)->int:
+        if not params:
+            _logger.WARN("插入对象不能为空")
+            return 0
+        
+        # 获取表结构信息
+        table_info = self.get_table_info(tablename)
+        if not table_info:
+            _logger.ERROR(f"无法获取表 {tablename} 的结构信息")
+            return 0        
+                
+        columns_info = table_info['columns']
+        auto_increment_column = table_info['auto_increment_column']
+        
+        valided_data = {}
+        
+        for field_name, field_value in params.items():
+            if field_name in columns_info:
+                # 跳过自增主键（通常由数据库自动生成）
+                if field_name == auto_increment_column:
+                    continue
+                if _is_null(field_value):
+                    valided_data[field_name] = None
+                else:                
+                    valided_data[field_name] = field_value            
+        
+        if not valided_data:
+            _logger.ERROR("没有有效的字段可以插入")
+            return 0
+        
+        # 构建列名和值
+        quoted_columns = [self._quote_identifier(col) for col in valided_data.keys()]
+        columns = ', '.join(quoted_columns)
+        placeholders = ', '.join([f':{col}' for col in valided_data.keys()])
+        
+        # 构建 SQL 语句
+        sql = f'INSERT INTO {tablename} ({columns}) VALUES ({placeholders})'
+        _logger.DEBUG(f'SQL={sql}')
+        _logger.DEBUG(f'Paramters={valided_data}')
+        
+        with self.engine.begin() as connection:
+            try:
+                results = connection.execute(text(sql), valided_data)                    
+                # 获取自增长ID
+                inserted_id = None
+                if auto_increment_column:
+                    inserted_id = self._get_last_insert_id(connection, tablename, auto_increment_column)
+                    params[auto_increment_column] = inserted_id
+                
+                if commit:
+                    connection.commit()
+                return results
+            except Exception as e:
+                connection.rollback()
+                _logger.ERROR("[Exception]", e)
+                raise e
+        
 
-    def updateT(self, tablename:str, params=None, commit=True):
-        pass
+    def updateT(self, tablename:str, params:dict=None, where:dict=None, condiftion:str=None, commit=True):
+        if not params:
+            _logger.WARN("更新对象不能为空")
+            return 0
+        
+        # 获取表结构信息
+        table_info = self.get_table_info(tablename)
+        if not table_info:
+            _logger.ERROR(f"无法获取表 {tablename} 的结构信息")
+            return 0        
+                
+        columns_info = table_info['columns']
+        
+        valided_data = {}
+        
+        for field_name, field_value in params.items():
+            if field_name in columns_info:                
+                if _is_null(field_value):
+                    valided_data[field_name] = None                    
+                else:                
+                    valided_data[field_name] = field_value            
+        
+        if not valided_data:
+            _logger.ERROR("没有有效的字段可以更新")
+            return 0
+        
+        # 构建列名和值
+        quoted_columns_placeholders = [f'{self._quote_identifier(col)}=:{INNER_UPDATE_PLACEHOLDER}{col}' for col in valided_data.keys()]
+        columns = ', '.join(quoted_columns_placeholders)         
+        
+        sql_params = {}
+        for field_name, field_value in valided_data.items():
+            sql_params[f'{INNER_UPDATE_PLACEHOLDER}{field_name}'] = field_value
+        
+        sql_params.update(where)
+                    
+        where_sql = ''
+        
+        # if where_data:
+        #     where_columns_placeholders = [f'{self._quote_identifier(col)}=:{INNER_QUERY_PLACEHOLDER}{col}' for col in where_data.keys()]
+        #     where_sql = ' AND '.join(where_columns_placeholders)
+        
+        if not str_isEmpty(condiftion):
+            where_sql = condiftion
+                
+        if not str_isEmpty(where_sql):
+            where_sql = ' WHERE ' + where_sql
+        
+        # 构建 SQL 语句
+        sql = f'UPDATE {tablename} SET {columns} {where_sql}'
+        _logger.INFO(f'SQL={sql}')
+        _logger.INFO(f'Paramters={sql_params}')
+        
+        with self.engine.begin() as connection:
+            try:
+                results = connection.execute(text(sql), sql_params)
+                if commit:
+                    connection.commit()
+                return results
+            except Exception as e:
+                connection.rollback()
+                _logger.ERROR("[Exception]", e)
+                raise e
     
+    
+    def _get_last_insert_id(self, connection, table_name: str, 
+                           auto_increment_column: str) -> Optional[Any]:
+        """获取最后插入的自增长ID"""        
+        db_type = self.getDbType()
+        
+        try:
+            if db_type == "mysql":
+                # MySQL 使用 LAST_INSERT_ID()
+                result = connection.execute(text("SELECT LAST_INSERT_ID()"))
+                return result.scalar()
+            
+            elif db_type == "postgresql":
+                # PostgreSQL 使用 RETURNING 子句或 currval
+                # 这里我们使用 currval，需要知道序列名
+                # 注意：这需要序列名遵循命名约定
+                sequence_name = f"{table_name}_{auto_increment_column}_seq"
+                result = connection.execute(text(f"SELECT currval('{sequence_name}')"))
+                return result.scalar()
+            
+            elif db_type == "sqlite":
+                # SQLite 使用 last_insert_rowid()
+                result = connection.execute(text("SELECT last_insert_rowid()"))
+                return result.scalar()
+            
+            elif db_type == "mssql":
+                # SQL Server 使用 SCOPE_IDENTITY()
+                result = connection.execute(text("SELECT SCOPE_IDENTITY()"))
+                return result.scalar()
+            
+            elif db_type == "oracle":
+                # Oracle 使用 RETURNING 子句，但这里我们使用序列的 currval
+                # 注意：这需要知道序列名
+                sequence_name = f"SEQ_{table_name}"
+                result = connection.execute(text(f"SELECT {sequence_name}.CURRVAL FROM DUAL"))
+                return result.scalar()
+            
+            else:
+                # 其他数据库的通用方法
+                _logger.WARN(f"数据库{db_type}的自增长ID获取方法未实现")
+                return None
+                
+        except Exception as e:
+            _logger.WARN(f"获取自增长ID失败: {e}")
+            return None
+        
+    def _quote_identifier(self, identifier: str) -> str:
+        """根据数据库类型引用标识符"""
+        # 大多数数据库使用双引号，但有些数据库使用其他符号
+        db_type = self.getDbType()
+        if db_type in ['mysql', 'sqlite']:
+            return f"`{identifier}`"
+        elif db_type in ['mssql']:
+            return f"[{identifier}]"
+        else:
+            return f'"{identifier}"'
      
     def _find_auto_increment_column(self, columns_info: Dict[str, Any]) -> Optional[str]:
         """查找自增长字段"""
@@ -196,11 +383,11 @@ class PydbcTools:
         return None
     
     def get_table_info(self, table_name: str, **kwargs) -> Dict[str, Any]:
-        """获取表的字段信息"""
-        db_type = self.engine.dialect.name
-        cache_key = f"{db_type}.{table_name}"
+        """获取表的字段信息"""        
+        cache_key = table_name
         
         if cache_key in self._table_cache:
+            _logger.DEBUG(f'从Cache里找到{table_name}表信息')
             return self._table_cache[cache_key]
         
         engine = self.engine
@@ -208,9 +395,16 @@ class PydbcTools:
             # 使用 SQLAlchemy 的 inspect 功能获取表结构
             inspector = inspect(engine)
             
+            arr = table_name.split('.')
+            if len(arr) == 1:
+                infos = inspector.get_columns(table_name)
+            else:
+                infos = inspector.get_columns(arr[1], arr[0])
             # 获取列信息
             columns_info = {}
-            for column in inspector.get_columns(table_name):
+            
+            
+            for column in infos:
                 col_name = column['name']
                 columns_info[col_name] = {
                     'type': str(column['type']),
@@ -221,7 +415,12 @@ class PydbcTools:
                 }
             
             # 获取主键信息
-            primary_keys = inspector.get_pk_constraint(table_name)
+            
+            if len(arr) == 1:
+                primary_keys = inspector.get_pk_constraint(table_name)
+            else:
+                primary_keys = inspector.get_pk_constraint(arr[1], arr[0])
+                
             if primary_keys and 'constrained_columns' in primary_keys:
                 for pk_col in primary_keys['constrained_columns']:
                     if pk_col in columns_info:
@@ -235,10 +434,11 @@ class PydbcTools:
             
             # 缓存表信息
             self._table_cache[cache_key] = table_info
+            _logger.DEBUG(f'缓存{table_name}表信息到Cache={table_info}')
             return table_info
             
         except SQLAlchemyError as e:
-            _logger.error(f"获取表结构失败: {e}")
+            _logger.ERROR(f"获取表结构失败: {e}")
             raise e
     
     def batch(self, sql, paramsList:list[dict|tuple]=None, batchsize:int=100, commit=True):
@@ -301,15 +501,41 @@ if __name__ == "__main__":
     url = url.set(password='123456')
     print(url)
     
+    # print('123123'.index(INNER_PLACEHOLDER))
+    
     url = 'mysql+pymysql://u:p@localhost:61306/dataflow_test?charset=utf8mb4'
     p = PydbcTools(url=url, username='stock_agent', password='1qaz2wsx', test='select 1')
     print(p)
     # print(p.queryOne('select * from sa_security_realtime_daily limit 10'))
     # print(p.queryPage('select * from sa_security_realtime_daily order by tradedate desc', None, page=1, pagesize=10))        
-    t = p.queryPage('select * from sa_security_realtime_daily where code=:code order by tradedate desc', {'code':'300492'}, page=1, pagesize=10)
+    # print(p.queryPage('select * from sa_security_realtime_daily where code=:code order by tradedate desc', {'code':'300492'}, page=1, pagesize=10))
+    t = p.queryPage('select * from sa_security_realtime_daily where tradedate=:tradedate order by tradedate desc', {'tradedate':'2025-09-30'}, page=1, pagesize=10)
     print(json_to_str(t))
     
-    print(p.get_table_info('sa_security_realtime_daily'))
+    print(p.get_table_info('dataflow_test.sa_security_realtime_daily'))
+    
+    
+    sample = '''
+    {"id":435177,"tradedate":"2025-09-30","code":"920819","name":"颖泰生物","price":"4.25","changepct":"-0.47","change":"-0.02","volume":"56537","turnover":"24137761.32","amp":"1.17","high":"4.3","low":"4.25","topen":"4.3","lclose":"4.27","qrr":"0.62","turnoverpct":"0.47","pe_fwd":"170.35","pb":"1.02","mc":"5209650000","fmc":"5131906875","roc":"-0.23","roc_5min":"-0.23","changepct_60day":"1.67","changepct_currentyear":"19.72","hot_rank_em":5116,"market":"SZ","createtime":"2025-09-30 09:32:17","updatetime":"2025-09-30 17:06:09","enable":1}
+    '''
+    from dataflow.utils.utils import str_to_json
+    sample:dict = str_to_json(sample)    
+    sample.pop('id',None)
+    sample.pop('high',None)
+    sample['low']=NULL    
+    sample['tradedate']='2025-01-05'
+    # p.insertT('dataflow_test.sa_security_realtime_daily', sample)
+    sample = '''
+    {"price":"4.25","changepct":"-0.47","change":"-0.02","volume":"56537","turnover":"24137761.32","amp":"1.17"}
+    '''
+    sample:dict = str_to_json(sample)
+    sample['topen']=NULL
+    rtn = p.updateT('dataflow_test.sa_security_realtime_daily', sample, {"code":"920819","tradedate":"2025-01-05"}, "code=:code and tradedate=:tradedate")
+    print(f'Result={rtn}')
+    
+    import sys
+    sys.exit()
+    
     
     url = 'postgresql+psycopg2://u:p@pgvector.ginghan.com:29432/aiproxy'
     p = PydbcTools(url=url, username='postgres', password='aiproxy', test='select 1')
