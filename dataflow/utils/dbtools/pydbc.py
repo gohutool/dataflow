@@ -4,7 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import PageResult
 from dataflow.utils.utils import json_to_str, str_isEmpty
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, overload
 from cachetools import Cache
 
 _logger = Logger('utils.dbtools.pydbc')
@@ -184,7 +184,7 @@ class PydbcTools:
                 results = connection.execute(text(sql), params)
                 if commit:
                     connection.commit()
-                return results
+                return results.rowcount
             except Exception as e:
                 connection.rollback()
                 _logger.ERROR("[Exception]", e)
@@ -247,15 +247,14 @@ class PydbcTools:
                 
                 if commit:
                     connection.commit()
-                return results
+                return results.rowcount
             except Exception as e:
                 connection.rollback()
                 _logger.ERROR("[Exception]", e)
                 raise e
         
-
-    def updateT(self, tablename:str, params:dict=None, where:dict=None, condiftion:str=None, commit=True):
-        if not params:
+    def updateT2(self, tablename:str, obj:dict=None, where:dict=None, condiftion:str=None, commit=True):
+        if not obj:
             _logger.WARN("更新对象不能为空")
             return 0
         
@@ -269,7 +268,7 @@ class PydbcTools:
         
         valided_data = {}
         
-        for field_name, field_value in params.items():
+        for field_name, field_value in obj.items():
             if field_name in columns_info:                
                 if _is_null(field_value):
                     valided_data[field_name] = None                    
@@ -292,12 +291,17 @@ class PydbcTools:
                     
         where_sql = ''
         
-        # if where_data:
-        #     where_columns_placeholders = [f'{self._quote_identifier(col)}=:{INNER_QUERY_PLACEHOLDER}{col}' for col in where_data.keys()]
-        #     where_sql = ' AND '.join(where_columns_placeholders)
+        where_data = {}
+        for field_name, field_value in where.items():
+            if field_name in columns_info:                
+                if _is_null(field_value):
+                    where_data[field_name] = None                    
+                else:                
+                    where_data[field_name] = field_value  
         
-        if not str_isEmpty(condiftion):
-            where_sql = condiftion
+        if where_data:
+            where_columns_placeholders = [f'{self._quote_identifier(col)}=:{col}' for col in where_data.keys()]
+            where_sql = ' AND '.join(where_columns_placeholders)
                 
         if not str_isEmpty(where_sql):
             where_sql = ' WHERE ' + where_sql
@@ -312,12 +316,128 @@ class PydbcTools:
                 results = connection.execute(text(sql), sql_params)
                 if commit:
                     connection.commit()
-                return results
+                return results.rowcount
             except Exception as e:
                 connection.rollback()
                 _logger.ERROR("[Exception]", e)
                 raise e
     
+    def updateT(self, tablename:str, obj:dict=None, condiftion:dict=None, commit=True):
+        if not obj:
+            _logger.WARN("更新对象不能为空")
+            return 0
+        
+        # 获取表结构信息
+        table_info = self.get_table_info(tablename)
+        if not table_info:
+            _logger.ERROR(f"无法获取表 {tablename} 的结构信息")
+            return 0        
+                
+        columns_info = table_info['columns']
+        
+        valided_data = {}        
+        
+        for field_name, field_value in obj.items():
+            if field_name in columns_info:                
+                if _is_null(field_value):
+                    valided_data[field_name] = None         
+                    # null_data[field_name] = None          
+                else:                
+                    valided_data[field_name] = field_value            
+        
+        if not valided_data:
+            _logger.ERROR("没有有效的字段可以更新")
+            return 0
+        
+        # 构建列名和值
+        quoted_columns_placeholders = [f'{self._quote_identifier(col)}=:{INNER_UPDATE_PLACEHOLDER}{col}' for col in valided_data.keys()]
+        columns = ', '.join(quoted_columns_placeholders)         
+        
+        sql_params = {}
+        for field_name, field_value in valided_data.items():
+            sql_params[f'{INNER_UPDATE_PLACEHOLDER}{field_name}'] = field_value
+        
+        # sql_params.update(condiftion)
+        
+        condiftion_data = {}
+        for field_name, field_value in condiftion.items():
+            if field_name in columns_info:                
+                if _is_null(field_value):
+                    condiftion_data[field_name] = ('IS', 'NULL')
+                    # null_data[field_name] = None          
+                else:                
+                    condiftion_data[field_name] =('=', f':{field_name}')
+                    sql_params[field_name] = field_value
+                    
+        where_sql = ''
+        
+        if condiftion_data:
+            where_columns_placeholders = [f'{self._quote_identifier(col)} {item[0]} {item[1]}' for col,item in condiftion_data.items()]
+            where_sql = ' AND '.join(where_columns_placeholders)
+        
+        if not str_isEmpty(where_sql):
+            where_sql = ' WHERE ' + where_sql
+        
+        # 构建 SQL 语句
+        sql = f'UPDATE {tablename} SET {columns} {where_sql}'
+        _logger.INFO(f'SQL={sql}')
+        _logger.INFO(f'Paramters={sql_params}')
+        
+        with self.engine.begin() as connection:
+            try:
+                results = connection.execute(text(sql), sql_params)
+                if commit:
+                    connection.commit()
+                return results.rowcount
+            except Exception as e:
+                connection.rollback()
+                _logger.ERROR("[Exception]", e)
+                raise e
+    
+    def deleteT(self, tablename:str, condiftion:dict=None, commit=True):
+        
+        # 获取表结构信息
+        table_info = self.get_table_info(tablename)
+        if not table_info:
+            _logger.ERROR(f"无法获取表 {tablename} 的结构信息")
+            return 0        
+                
+        columns_info = table_info['columns']
+        sql_params = {}
+        condiftion_data = {}
+        for field_name, field_value in condiftion.items():
+            if field_name in columns_info:                
+                if _is_null(field_value):
+                    condiftion_data[field_name] = ('IS', 'NULL')
+                    # null_data[field_name] = None          
+                else:                
+                    condiftion_data[field_name] =('=', f':{field_name}')
+                    sql_params[field_name] = field_value
+                    
+        where_sql = ''
+        
+        if condiftion_data:
+            where_columns_placeholders = [f'{self._quote_identifier(col)} {item[0]} {item[1]}' for col,item in condiftion_data.items()]
+            where_sql = ' AND '.join(where_columns_placeholders)
+        
+        if not str_isEmpty(where_sql):
+            where_sql = ' WHERE ' + where_sql
+        
+        # 构建 SQL 语句
+        sql = f'delete from {tablename} {where_sql}'
+        _logger.INFO(f'SQL={sql}')
+        _logger.INFO(f'Paramters={sql_params}')
+        
+        with self.engine.begin() as connection:
+            try:
+                results = connection.execute(text(sql), sql_params)
+                if commit:
+                    connection.commit()
+                return results.rowcount
+            except Exception as e:
+                connection.rollback()
+                _logger.ERROR("[Exception]", e)
+                raise e
     
     def _get_last_insert_id(self, connection, table_name: str, 
                            auto_increment_column: str) -> Optional[Any]:
@@ -524,13 +644,27 @@ if __name__ == "__main__":
     sample.pop('high',None)
     sample['low']=NULL    
     sample['tradedate']='2025-01-05'
-    # p.insertT('dataflow_test.sa_security_realtime_daily', sample)
+    # rtn = p.insertT('dataflow_test.sa_security_realtime_daily', sample)
+    # print(f'Result={rtn}')
+    
     sample = '''
     {"price":"4.25","changepct":"-0.47","change":"-0.02","volume":"56537","turnover":"24137761.32","amp":"1.17"}
     '''
     sample:dict = str_to_json(sample)
     sample['topen']=NULL
-    rtn = p.updateT('dataflow_test.sa_security_realtime_daily', sample, {"code":"920819","tradedate":"2025-01-05"}, "code=:code and tradedate=:tradedate")
+    rtn = p.updateT2('dataflow_test.sa_security_realtime_daily', sample, {"code":"920819","tradedate":"2025-01-05"}, "code=:code and tradedate=:tradedate")
+    print(f'Result={rtn}')
+    
+    sample1 = '''
+    {"code":"920819","tradedate":"2025-01-05","price":"4.25","changepct":"-0.47","change":"-0.02","volume":"56537","turnover":"24137761.32","amp":"1.17"}
+    '''
+    sample1:dict = str_to_json(sample1)
+    sample1['topen']=1.0
+    rtn = p.updateT('dataflow_test.sa_security_realtime_daily', sample, sample1)
+    print(f'Result={rtn}')
+    
+    sample1['topen']=NULL
+    rtn = p.deleteT('dataflow_test.sa_security_realtime_daily', sample1)
     print(f'Result={rtn}')
     
     import sys
