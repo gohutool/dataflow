@@ -2,7 +2,7 @@
 from typing import Callable
 from starlette.middleware.base import BaseHTTPMiddleware
 from dataflow.utils.log import Logger
-from dataflow.utils.utils import str_isEmpty,str_strip, ReponseVO,json_to_str  # noqa: F401
+from dataflow.utils.utils import str_isEmpty,str_strip, ReponseVO, get_list_from_dict, get_bool_from_dict  # noqa: F401
 from dataflow.utils.web.asgi import get_remote_address, CustomJSONResponse
 from dataflow.module import Context, WebContext
 from antpathmatcher import AntPathMatcher
@@ -11,6 +11,7 @@ from slowapi import Limiter
 # from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 
 _logger = Logger('module.context.web')
@@ -140,7 +141,34 @@ def init_error_handler(app:FastAPI):
         )
 
 
-if __name__ == "__main__":
+@Context.Configurationable(prefix='context.web.cors')
+def _config_cors_filter(config):
+    _logger.DEBUG(f'CORS过滤器装饰器信息=[{config}]')
+    
+    @WebContext.Event.on_started
+    def _init_cros_filter(app:FastAPI):        
+        # origins = ["*"]        
+        opts = {
+            'allow_origins':get_list_from_dict(config, 'allow_origins', ["*"]),
+            'allow_methods':get_list_from_dict(config, 'allow_methods', ["*"]),
+            'allow_headers':get_list_from_dict(config, 'allow_headers', ["*"]),
+            'allow_credentials':get_bool_from_dict(config, 'allow_credentials', True),
+        }
+        app.add_middleware(
+            CORSMiddleware,
+            **opts
+            # # allow_origins=origins,
+            # allow_origins=["*"],
+            # allow_credentials=True,
+            # allow_methods=["*"],
+            # allow_headers=["*"],
+        )
+        _logger.DEBUG(f'添加CORS过滤器装饰器[{opts}]={CORSMiddleware}成功')
+        
+_config_cors_filter()        
+    
+
+if __name__ == "__main__":    
     matcher = AntPathMatcher()
     def test_match(str1,str2):
         print(f'matcher.match("{str1}", "{str2}") = {matcher.match(str1, str2)}')       # 输出: True

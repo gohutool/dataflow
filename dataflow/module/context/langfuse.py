@@ -1,0 +1,24 @@
+from dataflow.module import Context
+from dataflow.utils.log import Logger
+from dataflow.utils.trace.langfuse import LangfusePlugin, Setup_Langfuser
+from typing import Callable
+
+prefix = 'context.langfuse'
+
+_logger = Logger('module.context.langfuse')
+
+class LangfuseContext:    
+    observe:Callable = LangfusePlugin.observe
+        
+
+@Context.Configurationable(prefix=prefix)
+def _init_langfuse_context(config):
+    c = config
+    if c:
+        Setup_Langfuser(**config)        
+        _logger.INFO(f'初始Langfuse日志跟踪{prefix}[{c}]')        
+    else:
+        _logger.INFO('没有配置Langfuse日志跟踪，跳过初始化')
+
+_init_langfuse_context()
+

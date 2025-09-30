@@ -48,12 +48,23 @@ context:
     port: ${env:REDIS.port:60379}
     db: ${env:REDIS.db:14}
     password: ${env:REDIS.password:12345678}
+  langfuse:
+    secret_key: ${env:LANGFUSE.secret_key:sk-lf-b60f4b33-ff5a-46ac-9086-e776373c86da}
+    public_key: ${env:LANGFUSE.public_key:pk-lf-4172303b-f7c4-4dc0-9d77-184d99c06131}
+    host: ${env:LANGFUSE.host:https://us.cloud.langfuse.com}
   milvus:
     uri: ${env:MILVUS.uri:https://milvus.ginghan.com}  
     user: ${env:MILVUS.user:}
     password: ${env:MILVUS.password:}
     timeout: ${env:MILVUS.timeout:}
     token: ${env:MILVUS.token:}
+  web:
+    cors:
+      allow_origins: 
+        - '*'
+      allow_methods: '*'
+      allow_header: '*'
+      allow_credentials: yes
   test:
     web:
       title: DataFlow

@@ -20,6 +20,7 @@ _web_onstarted = []
 
 
 class Context:
+    MOCK:bool = False
     class Event:
         @staticmethod        
         def on_init(func):
@@ -45,7 +46,7 @@ class Context:
             _handlers = None
             if not event :
                 event = 'loaded'
-            _logger.DEBUG(f'触发{event}开始')    
+            _logger.DEBUG(f'Context触发{event}开始')    
             if event.strip().lower()=='loaded':
                 _handlers = _onloaded
             elif event.strip().lower()=='started':
@@ -58,11 +59,11 @@ class Context:
                 return             
             for f in _handlers:
                 f(*args, **kwargs)
-            _logger.DEBUG(f'触发{event}结束')
+            _logger.DEBUG(f'Context触发{event}结束')
         
     @staticmethod
     def getContext():
-        if _contextContainer._context is None:
+        if _contextContainer._context is None and not Context.MOCK :
             raise Exception('没有初始化上下文，请先使用Context.initContext进行初始化')
         return _contextContainer._context
     
@@ -159,7 +160,7 @@ class WebContext:
             _handlers = None
             if not event :
                 event = 'loaded'
-            _logger.DEBUG(f'触发{event}开始')
+            _logger.DEBUG(f'WebContext触发{event}开始')
             if event.strip().lower()=='loaded':
                 _handlers = _web_onloaded
             elif event.strip().lower()=='started':
@@ -168,7 +169,7 @@ class WebContext:
                 return             
             for f in _handlers:
                 f(*args, **kwargs)
-            _logger.DEBUG(f'触发{event}结束')
+            _logger.DEBUG(f'WebContext触发{event}结束')
             
     @staticmethod
     def getContext():

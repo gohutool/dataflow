@@ -65,7 +65,7 @@ def print_load_test(context, modules):
         
 
 @WebContext.Event.on_started
-def print_web_start_test():
+def print_web_start_test(app):
     _logger.DEBUG('@WebContext.Event.on_start======================= 启动程序')
     
 @WebContext.Event.on_loaded

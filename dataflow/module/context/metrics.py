@@ -70,7 +70,9 @@ def setup_metrics(app):
     """
     # Add Prometheus middleware
     app.add_middleware(PrometheusMiddleware)
+    _logger.INFO('添加过滤器PrometheusMiddleware')
     app.add_middleware(MetricsMiddleware)
+    _logger.INFO('添加过滤器MetricsMiddleware')
 
     # Add metrics endpoint
     app.add_route("/prometheus/metrics", metrics)
@@ -81,8 +83,7 @@ def setup_metrics(app):
 class MetricsMiddleware(BaseHTTPMiddleware):
     """Middleware for tracking HTTP request metrics."""
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)                
-        _logger.INFO('创建过滤器MetricsMiddleware')
+        super().__init__(*args, **kwargs)                        
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Track metrics for each request.

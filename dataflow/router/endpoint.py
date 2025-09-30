@@ -4,12 +4,12 @@ from fastapi import FastAPI, Request# noqa: F401
 from dataflow.utils.utils import current_millsecond
 import uuid
 from dataflow.utils.web.asgi import Init_fastapi_jsonencoder_plus
-from fastapi.middleware.cors import CORSMiddleware
 
 from contextlib import asynccontextmanager
 from dataflow.utils.log import Logger
-from dataflow.utils.web.asgi import get_ipaddr, CustomJSONResponse
+from dataflow.utils.web.asgi import get_ipaddr
 from dataflow.module import Context, WebContext
+# from fastapi.middleware.cors import CORSMiddleware
 
 _logger = Logger('router.endpoint')
 
@@ -32,6 +32,7 @@ app = FastAPI(lifespan=lifespan,
             #   default_response_class=CustomJSONResponse,            
               version="1.0.0")
 
+    
 @Context.Context(app=app, scan='dataflow.application.**')
 def initApp(app:FastAPI):
     _logger.INFO(f'开始初始化App={app}')
@@ -46,7 +47,7 @@ def initApp(app:FastAPI):
         response = await call_next(request)
         _logger.INFO(f"[{rid}] {request.method} {request.url}")        
         return response    
-    _logger.DEBUG(f'创建过滤器装饰器={authcheck_handler}')
+    _logger.DEBUG(f'添加过滤器装饰器={authcheck_handler}')
 
     @app.middleware("http")
     async def xid_handler(request: Request, call_next):
@@ -63,22 +64,19 @@ def initApp(app:FastAPI):
         ip = get_ipaddr(request)
         _logger.INFO(f"[{request.url}][{ip}] {response.status_code} {cost:.2f}ms")
         return response        
-    _logger.DEBUG(f'创建过滤器装饰器={xid_handler}')
-    
-    # origins = ["*"]
-
-    app.add_middleware(
-        CORSMiddleware,
-        # allow_origins=origins,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    _logger.DEBUG(f'创建过滤器装饰器={CORSMiddleware}')
-          
-        
+    _logger.DEBUG(f'添加过滤器装饰器={xid_handler}')
+         
+    # app.add_middleware(
+    #     CORSMiddleware,
+    #     # **opts
+    #     # # allow_origins=origins,
+    #     allow_origins=["*"],
+    #     # allow_credentials=True,
+    #     allow_methods=["*"],
+    #     allow_headers=["*"],
+    # )
+    # _logger.DEBUG(f'添加CORS过滤器装饰器={CORSMiddleware}成功')     
 
 initApp(app=app)    
-WebContext.Event.emit('start', app)
+WebContext.Event.emit('started', app)
     

@@ -422,6 +422,85 @@ def build_market(code:str, market:str='SH'):
     market = 'SZ' if code.startswith('4') or code.startswith('83') or code.startswith('87')  or code.startswith('92') else market
     return market
 
+
+def getAttrPlus(data:dict, field:str, dv:any=None)->any:
+    if data is None:
+        return dv
+    rtn = None
+    
+    obj = data
+    
+    """'a.b.c' -> 逐层取值"""
+    for key in field.split('.'):        
+        if isinstance(obj, dict):
+            if key in obj:
+                obj = obj[key]
+            else:
+                obj = None
+        else:
+            obj = getattr(obj, key, None)    
+            
+        if obj is None:
+            break       
+        
+    if obj is None:
+        rtn = dv
+    else:
+        rtn = obj
+            
+    return rtn
+
+def get_str_from_dict(d:dict, k:any, kv:str):
+    v = None
+    if k in d:
+        v = getAttrPlus(d, k, kv)
+    if v is None:
+        v = kv
+    return v
+
+
+def get_int_from_dict(d:dict, k:any, kv:int):
+    v = None
+    if k in d:
+        v = getAttrPlus(d, k, kv)
+    if v is None:
+        v = kv
+    return int(str2Num(v, kv))
+
+def get_float_from_dict(d:dict, k:any, kv:float):
+    v = None
+    if k in d:
+        v = getAttrPlus(d, k, kv)
+    if v is None:
+        v = kv
+    return str2Num(v, kv)
+
+def get_bool_from_dict(d:dict, k:any, kv:bool=False):
+    v = None
+    if k in d:
+        v = getAttrPlus(d, k, kv)
+    if v is None:
+        v = kv
+    return str2Bool(v, kv)
+
+def get_from_dict(d:dict, k:any, kv:any):
+    v = None
+    if k in d:
+        v = getAttrPlus(d, k, kv)
+    if v is None:
+        v = kv
+    return v
+
+def get_list_from_dict(d:dict, k:any, kv:any):
+    v = None
+    if k in d:
+        v = getAttrPlus(d, k, kv)
+        if isinstance(v, str):
+            v = str_strip(v).split(',')
+    if v is None:
+        v = kv
+    return v
+
 # def copy2Dict(
 #                 obj: Any, 
 #                 include_private: bool = False,
