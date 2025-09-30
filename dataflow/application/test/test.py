@@ -1,10 +1,11 @@
-from dataflow.utils.utils import current_millsecond
+from dataflow.utils.utils import current_millsecond, ReponseVO, date_datetime_cn
 from dataflow.utils.web.asgi import get_remote_address
 from dataflow.module import Context,WebContext
 from dataflow.utils.log import Logger
 from fastapi import FastAPI, Request, status # noqa: F401
 from fastapi.responses import JSONResponse
 from dataflow.module.context.web import filter, limiter
+from dataflow.module.context.redis import RedisContext
 
 _logger = Logger('application.test')
 app:FastAPI = WebContext.getRoot()
@@ -25,6 +26,13 @@ async def test_endpoint(request:Request):
         content={"message": "测试中间件顺序"}
     )
     # return {"message": "测试中间件顺序"}  
+    
+
+@app.get("/test/redis/{itemid}")
+@RedisContext.redis_cache(ttl=60, prefix='cache:data:test:items')
+async def test_redis_cache(request:Request, itemid:str):
+    _logger.INFO('测试Redis_Cache组件')
+    return ReponseVO(data={"itemid":itemid, "time":date_datetime_cn()})
     
 @filter(path='/test,/test/**')
 async def costtime_handler(request: Request, call_next):
