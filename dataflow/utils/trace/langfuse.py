@@ -25,6 +25,7 @@ class LangfusePlugin:
     def flush():
         if LangfusePlugin._langfuse:
             LangfusePlugin._langfuse.flush()
+            _logger.INFO('Langfuse清理缓存')
     
     @staticmethod
     def observe(func: Callable):

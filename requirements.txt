@@ -23,4 +23,5 @@ antpathmatcher==1.0.1
 sqlalchemy==2.0.38
 oracledb==3.2.0
 slowapi==0.1.9
+cachetools==5.5.0
 

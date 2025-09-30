@@ -117,7 +117,7 @@ def test_na():
 
 def str_strip(txt:str)->str:
     if str_isEmpty(txt):
-        return None
+        return ''
     return re.sub(r'\s+', ' ', txt).strip()
 
 def str_isEmpty(txt:str)->bool:
@@ -500,6 +500,46 @@ def get_list_from_dict(d:dict, k:any, kv:any):
     if v is None:
         v = kv
     return v
+
+def center_str(txt:str, width:int, fillchar=' ', trim:bool=False):
+    txt = str_strip(txt)
+    if trim and len(txt) >= width:
+        return txt[:width]
+    return txt.center(width, fillchar)
+
+def l_str(txt:str, width:int, fillchar=' ', trim:bool=False):
+    txt = str_strip(txt)
+    if trim and len(txt) >= width:
+        return txt[:width]
+    return txt.ljust(width, fillchar)
+
+def r_str(txt:str, width:int, fillchar=' ', trim:bool=False):
+    txt = str_strip(txt)
+    if trim and len(txt) >= width:
+        return txt[:width]
+    return txt.rjust(width, fillchar)
+
+def center_byts(d:bytes, width:int, fillchar=b'\0', trim:bool=False):
+    if d is not None:
+        if trim and len(d) >= width:
+            return d[:width]
+        return d.center(width, fillchar)
+    return d
+
+def l_bytes(d:bytes, width:int, fillchar=b'\0', trim:bool=False):
+    if d is not None:
+        if trim and len(d) >= width:
+            return d[:width]
+        return d.ljust(width, fillchar)
+    return d
+
+def r_bytes(d:bytes, width:int, fillchar=b'\0', trim:bool=False):
+    if d is not None:
+        if trim and len(d) >= width:
+            return d[:width]
+        return d.rjust(width, fillchar)
+    return d
+
 
 # def copy2Dict(
 #                 obj: Any, 

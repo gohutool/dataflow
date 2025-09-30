@@ -1,8 +1,11 @@
-from sqlalchemy import create_engine, Engine, text, event, make_url
+from sqlalchemy import create_engine, Engine, text, event, make_url, inspect
 from sqlalchemy.pool import QueuePool
+from sqlalchemy.exc import SQLAlchemyError
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import PageResult
 from dataflow.utils.utils import json_to_str
+from typing import Any, Dict
+from cachetools import TTLCache
 
 _logger = Logger('utils.dbtools.pydbc')
 
@@ -47,6 +50,7 @@ def _setup_monitoring(engine:Engine):
 
 class PydbcTools:
     def __init__(self, **kwargs):
+        self._table_cache = TTLCache(maxsize=128, ttl=60)
         self.__config__ = kwargs
         self.__url = make_url(
                 self.__config__['url']
@@ -183,6 +187,58 @@ class PydbcTools:
     def updateT(self, tablename:str, params=None, commit=True):
         pass
     
+    
+    def get_table_info(self, table_name: str, **kwargs) -> Dict[str, Any]:
+        """获取表的字段信息"""
+        db_type = self.engine.dialect.name
+        cache_key = f"{db_type}.{table_name}"
+        
+        if cache_key in self._table_cache:
+            return self.table_cache[cache_key]
+        
+        engine = None
+        try:
+            if db_type in self.engines:
+                engine = self.engines[db_type]
+            else:
+                engine = self.connect(db_type, **kwargs)
+            
+            # 使用 SQLAlchemy 的 inspect 功能获取表结构
+            inspector = inspect(engine)
+            
+            # 获取列信息
+            columns_info = {}
+            for column in inspector.get_columns(table_name):
+                col_name = column['name']
+                columns_info[col_name] = {
+                    'type': str(column['type']),
+                    'nullable': column['nullable'],
+                    'default': column['default'],
+                    'autoincrement': column.get('autoincrement', False),
+                    'primary_key': False
+                }
+            
+            # 获取主键信息
+            primary_keys = inspector.get_pk_constraint(table_name)
+            if primary_keys and 'constrained_columns' in primary_keys:
+                for pk_col in primary_keys['constrained_columns']:
+                    if pk_col in columns_info:
+                        columns_info[pk_col]['primary_key'] = True
+            
+            table_info = {
+                'columns': columns_info,
+                'primary_keys': primary_keys.get('constrained_columns', []) if primary_keys else [],
+                'auto_increment_column': self._find_auto_increment_column(columns_info)
+            }
+            
+            # 缓存表信息
+            self.table_cache[cache_key] = table_info
+            return table_info
+            
+        except SQLAlchemyError as e:
+            _logger.error(f"获取表结构失败: {e}")
+            return {}
+    
     def batch(self, sql, paramsList:list[dict|tuple]=None, batchsize:int=100, commit=True):
         _logger.DEBUG(f"[SQL]:{sql}")
         _logger.DEBUG(f"[Parameters]:{paramsList}")
@@ -246,26 +302,29 @@ if __name__ == "__main__":
     url = 'mysql+pymysql://u:p@localhost:61306/stock_agent?charset=utf8mb4'
     p = PydbcTools(url=url, username='stock_agent', password='1qaz2wsx', test='select 1')
     print(p)
-    print(p.queryOne('select * from sa_security_realtime_daily limit 10'))
-    print(p.queryPage('select * from sa_security_realtime_daily order by tradedate desc', None, page=1, pagesize=10))        
+    # print(p.queryOne('select * from sa_security_realtime_daily limit 10'))
+    # print(p.queryPage('select * from sa_security_realtime_daily order by tradedate desc', None, page=1, pagesize=10))        
     t = p.queryPage('select * from sa_security_realtime_daily where code=:code order by tradedate desc', {'code':'300492'}, page=1, pagesize=10)
     print(json_to_str(t))
     
     url = 'postgresql+psycopg2://u:p@pgvector.ginghan.com:29432/aiproxy'
     p = PydbcTools(url=url, username='postgres', password='aiproxy', test='select 1')
     print(p)
-    print(p.queryOne('select * from logs limit 10'))
-    print(p.queryPage('select * from logs order by request_at desc', None, page=1, pagesize=10))        
-    print(p.queryPage('select * from logs where endpoint=:code order by request_at desc', {'code':'/v1/chat/completions'}, page=1, pagesize=10))
-    
+    # print(p.queryOne('select * from logs limit 10'))
+    # print(p.queryPage('select * from logs order by request_at desc', None, page=1, pagesize=10))        
+    # print(p.queryPage('select * from logs where endpoint=:code order by request_at desc', {'code':'/v1/chat/completions'}, page=1, pagesize=10))
+    t = p.queryPage('select * from logs where endpoint=:code order by request_at desc', {'code':'/v1/chat/completions'}, page=1, pagesize=10)
+    print(json_to_str(t))
     
     # url = 'oracle+cx_oracle://u:p@localhost:1521/?service_name=XE'
     url = 'oracle+oracledb://u:p@localhost:60521/?service_name=ORCL'
     p = PydbcTools(url=url, username='system', password='orcl', test='select 1 from dual')
     print(p)
-    print(p.queryOne('SELECT * FROM dba_registry'))
-    print(p.queryPage('SELECT * FROM dba_registry', None, page=1, pagesize=10))        
-    print(p.queryPage("SELECT * FROM dba_registry where version like '%'||:version||'%' order by comp_id desc", {'version':'19'}, page=1, pagesize=10))
+    # print(p.queryOne('SELECT * FROM dba_registry'))
+    # print(p.queryPage('SELECT * FROM dba_registry', None, page=1, pagesize=10))        
+    # print(p.queryPage("SELECT * FROM dba_registry where version like '%'||:version||'%' order by comp_id desc", {'version':'19'}, page=1, pagesize=10))
+    t = p.queryPage("SELECT * FROM dba_registry where version like '%'||:version||'%' order by comp_id desc", {'version':'19'}, page=1, pagesize=10)
+    print(json_to_str(t))
     
     
     

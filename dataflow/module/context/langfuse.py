@@ -19,6 +19,11 @@ def _init_langfuse_context(config):
         _logger.INFO(f'初始Langfuse日志跟踪{prefix}[{c}]')        
     else:
         _logger.INFO('没有配置Langfuse日志跟踪，跳过初始化')
+        
+    @Context.Event.on_exit
+    def _on_exit():
+        LangfusePlugin.flush()
 
 _init_langfuse_context()
+
 
