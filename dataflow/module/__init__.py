@@ -100,9 +100,14 @@ class Context:
         _logger.DEBUG(f'初始化内部模块路径{module_path}结束')
         Context.Event.emit('init', self, _modules)
         pass
-            
+    
     @staticmethod
-    def Context(*,app:FastAPI, application_yaml:str='conf/application.yaml', scan:str='dataflow.application'):                
+    def Value(placeholder:str)->any:
+        return Context.getContext().getConfigContext().value(placeholder)
+        
+    
+    @staticmethod
+    def Start_Context(*,app:FastAPI=None, application_yaml:str='conf/application.yaml', scan:str='dataflow.application'):
         if _contextContainer._webcontext is None:            
             WebContext.initContext(app)         
             
@@ -112,6 +117,10 @@ class Context:
             _logger.WARN('Context已经启动')        
             
         WebContext.Event.emit('loaded', app)
+            
+    @staticmethod
+    def Context(*,app:FastAPI, application_yaml:str='conf/application.yaml', scan:str='dataflow.application'):                
+        Context.Start_Context(app, application_yaml, scan)
                 
         def decorator(func: Callable) -> Callable:
             @wraps(func)

@@ -59,6 +59,7 @@ def initApp(app:FastAPI):
         
         response = await call_next(request)
         response.headers["X-Request-ID"] = rid        
+        response.headers["server"] = 'Tomcat-10.0.x'
         # ====== 响应阶段 ======
         cost = (current_millsecond() - start)
         ip = get_ipaddr(request)
@@ -79,4 +80,5 @@ def initApp(app:FastAPI):
 
 initApp(app=app)    
 WebContext.Event.emit('started', app)
+    
     

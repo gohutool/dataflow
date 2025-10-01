@@ -209,18 +209,20 @@ class YamlConfigation:
     def __init__(self, yaml_path, **kwargs):            
         # 加载 YAML 配置（支持 ${} 占位符）    
         c = OmegaConf.load(yaml_path)    
+        self._c = c
         # OmegaConf.resolve(c)
-        self.__config = OmegaConf.to_container(c, resolve=True)
+        self._config = OmegaConf.to_container(c, resolve=True)
+        self._config_temp = OmegaConf.create(self._config)
         
     def getConfig(self, prefix:str=None)->any:
-        c = self.__config
+        c = self._config
         if str_isEmpty(prefix):
             return c
         else:            
             return getAttrPlus(c,prefix)
         
     def getStr(self, key, dv:str=None)->str:
-        c = self.__config
+        c = self._config
         obj = getAttrPlus(c, key, None)
         if str_isEmpty(obj):
             return dv
@@ -228,7 +230,7 @@ class YamlConfigation:
             return str(obj)
         
     def getBool(self, key, dv:int=None)->bool:
-        c = self.__config
+        c = self._config
         obj = getAttrPlus(c, key, None)
         if str_isEmpty(obj):
             return dv
@@ -236,7 +238,7 @@ class YamlConfigation:
             return str2Bool(str(obj))
         
     def getInt(self, key, dv:int=None)->int:
-        c = self.__config
+        c = self._config
         obj = getAttrPlus(c, key, None)
         if str_isEmpty(obj):
             return dv
@@ -244,7 +246,7 @@ class YamlConfigation:
             return int(str2Num(str(obj)))
         
     def getFloat(self, key, dv:float=None)->float:
-        c = self.__config
+        c = self._config
         obj = getAttrPlus(c, key, None)
         if str_isEmpty(obj):
             return dv
@@ -252,21 +254,33 @@ class YamlConfigation:
             return str2Num(str(obj))
         
     def getList(self, key)->List:
-        c = self.__config
+        c = self._config
         obj = getAttrPlus(c, key, None)
         if str_isEmpty(obj):
             return []
         else:
             return list(obj).copy()
+        
+    def value(self, placeholder:str):
+        if not placeholder:
+            return placeholder
+        if '$' in placeholder:
+            temp_config = OmegaConf.create({"___temp___": placeholder})
+            merged = OmegaConf.merge(self._config_temp, temp_config)
+            return merged['___temp___']
     
 
 if __name__ == "__main__":
     yaml_path = 'conf/application.yaml'
     
+    config:YamlConfigation = None
     config = YamlConfigation.loadConfiguration(yaml_path)
     config = YamlConfigation.loadConfiguration(yaml_path)
     
     print(config.getConfig())
     
     print(f'server={config.getConfig('server')} server.port={config.getConfig('server.port')}')
+    s = '${env:LANGFUSE.secret_key:sk-lf-b60f4b33-ff5a-46ac-9086-e776373c86da}  ${env:DB_PASSWORD:password}'
+    v = config.value(s)
+    print(f'{s} = {v}')
     
