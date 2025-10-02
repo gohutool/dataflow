@@ -1,5 +1,5 @@
 from dataflow.utils.log import Logger
-from dataflow.utils.reflect import loadlib_by_path,get_fullname
+from dataflow.utils.reflect import loadlib_by_path,get_fullname,get_methodname
 from dataflow.utils.utils import str_isEmpty
 from fastapi import FastAPI, Request, HTTPException
 from typing import Callable,Type,Any,Optional,Dict
@@ -113,6 +113,8 @@ class Context:
         
     def __init__(self, applicationConfig_file:str, scan_path:str):
         self._CONTEXT = {}     
+        self._CONTEXT_DEP :dict[list[tuple[str,any]]]= {}
+        self._INJECT_METHOD_CONTEXT = {}
         self.appcaltion_file=applicationConfig_file
         self.scan_path = scan_path
         self._application_config:YamlConfigation = YamlConfigation.loadConfiguration(self.appcaltion_file)        
@@ -131,6 +133,17 @@ class Context:
             return self._CONTEXT[k]
         else:
             raise Context.ContextExceptoin(f'不能找到{service_name}服务，先注册实例')
+    
+    def add_dep_info(self, service, target):
+        k = str(service)
+        deps = None
+        if k not in Context.getContext()._CONTEXT_DEP:
+            deps = []
+            Context.getContext()._CONTEXT_DEP[k] = deps
+        else:
+            deps = Context.getContext()._CONTEXT_DEP[k]
+        deps.append(target)
+        _logger.DEBUG(f'添加服务依赖信息{target}->{service}')
     
     def _parseContext(self):        
         module_path = 'dataflow.module.**'
@@ -256,7 +269,14 @@ class Context:
                         _typ = type_hints.get(name)
                         if str_isEmpty(b_name) or str_isEmpty(f_name) or _typ:
                             serviceimpl = None
-                            if not str_isEmpty(b_name):                                
+                            inject_k = str(func)
+                            incache = False
+                            if inject_k in Context.getContext()._INJECT_METHOD_CONTEXT:
+                                serviceimpl = Context.getContext()._INJECT_METHOD_CONTEXT[inject_k]
+                                _logger.DEBUG(f'从缓存中获取服务实例{serviceimpl}={inject_k}')
+                                incache = True
+                            
+                            if serviceimpl is None and not str_isEmpty(b_name):                                
                                 try:
                                     service_name = b_name
                                     serviceimpl = Context.getContext().getBean(service_name)
@@ -264,7 +284,6 @@ class Context:
                                 except Exception:
                                     _logger.DEBUG(f'从名称{b_name}没有获取服务实例')
                                     pass
-                                
                                                                                                 
                             if serviceimpl is None and not str_isEmpty(f_name):                
                                 try:
@@ -289,6 +308,9 @@ class Context:
                                 serviceimpl = value 
                             else:
                                 is_autowired = True
+                                if not incache:                                                                
+                                    Context.getContext()._INJECT_METHOD_CONTEXT[inject_k] = serviceimpl
+                                    Context.getContext().add_dep_info(serviceimpl, ('Func', func))
                                 
                             # 根据参数种类决定放哪
                             if param.kind in (inspect.Parameter.POSITIONAL_ONLY,
@@ -407,7 +429,37 @@ class WebContext:
     def getApp(self)->FastAPI:
         return self._app
     
-
+@WebContext.Event.on_loaded
+def _register_router_for_actuctor(app:FastAPI):
+    @app.get('/actuator/infos')
+    def actuator_infos():
+        rtn = {}
+        for k, v in Context.getContext()._CONTEXT.copy().items():
+            rtn[k] = get_fullname(v)
+        return rtn
+    
+    @app.get('/actuator/info/{itemid}')
+    def actuator_info(itemid:str):
+        k = Context.SERVICE_PREFIX + '.' + itemid
+        if k not in Context.getContext()._CONTEXT:
+            raise Context.ContextExceptoin('没有找到{itemid}对应服务')
+        else:
+            serviceImpl = Context.getContext()._CONTEXT[k]
+            rtn = {
+                    'service_id': Context.SERVICE_PREFIX + '.' + itemid,
+                    'name': itemid,
+                    'service': get_fullname(serviceImpl),
+                    'references':[]
+            }
+            k = str(serviceImpl)
+            if k in Context.getContext()._CONTEXT_DEP:
+                for o in Context.getContext()._CONTEXT_DEP[k]:
+                    rtn['references'].append({
+                        'Type':o[0],
+                        'Name':get_fullname(o[1]) if o[0]=='Class' else get_methodname(o[1])
+                    })
+            
+            return rtn    
 
         
 @Context.Event.on_loaded
@@ -440,7 +492,8 @@ def _assemble_bindding_service(context:Context, modules:list):
             
         if serviceimpl is None:
             raise Exception(f'注入装载{get_fullname(_owner)}属性{_name}出现问题，没有找到服务实例{service_name}')
-        _aw._serviceimpl = serviceimpl
+        _aw._serviceimpl = serviceimpl        
+        Context.getContext().add_dep_info(serviceimpl, ('Class', _owner))
         total += 1
         _logger.DEBUG(f'注入装载{get_fullname(_owner)}属性{_name}成功，找到服务实例{service_name}')
         

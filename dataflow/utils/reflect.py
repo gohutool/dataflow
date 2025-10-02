@@ -5,6 +5,7 @@ import pkgutil
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import current_millsecond
 import sys 
+import inspect
 
 _logger = Logger('utils.reflect')
 
@@ -200,7 +201,14 @@ def get_fullname(obj:any|Type)->str:
 
 def get_generic(obj:any)->Type:    
     return get_origin(obj), get_args(obj)
-    
+
+def get_methodname(func:callable)->str:
+    # 自己拼出想要的字符串
+    # sig = inspect.signature(func)
+    params = ','.join(inspect.signature(func).parameters)
+    full_name =  f"{func.__module__}.{func.__qualname__}({params})"
+    # full_name = f"{func.__module__}.{func.__qualname__}"    
+    return full_name    
 
 # 定义原始类型
 primitive_types = (int, float, bool, str, type(None))
@@ -232,3 +240,6 @@ if __name__ == '__main__':
     print(get_generic(list[int]))        # (<class 'list'>, (<class 'int'>,))
     print(get_generic(dict[str, int]))   # (<class 'dict'>, (<class 'str'>, <class 'int'>))
     print(get_generic(int))              # (None, ())
+    
+    print(get_methodname(get_methodname))    
+    print(get_methodname(getAttrPlus))
