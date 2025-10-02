@@ -21,9 +21,10 @@ def _init_datasource_context(config):
     if c:
         default_ok:bool = False
         for k, v in c.items():                
+            _logger.INFO(f'初始化数据源{prefix}.{k}[{v}]开始')
             pt = PydbcTools(**v)
             Context.getContext().registerBean(f'{prefix}.{k}', pt)
-            _logger.INFO(f'初始化数据源{prefix}.{k}[{v}]={pt}')
+            _logger.INFO(f'初始化数据源{prefix}.{k}[{v}]={pt}成功')
             if not default_ok:
                 Context.getContext().registerBean(f'{prefix}.default', pt)
                 default_ok = True

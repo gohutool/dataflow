@@ -9,10 +9,10 @@ from antpathmatcher import AntPathMatcher
 from fastapi import Request, FastAPI
 from slowapi import Limiter
 # from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
+from fastapi.exceptions import RequestValidationError,HTTPException
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
-
+from functools import wraps
 
 _logger = Logger('module.context.web')
 
@@ -97,6 +97,15 @@ _limiters = {}
 _limiters['IP'] = _ip_limiter
 _limiters['GLOBAL'] = _global_limiter
 
+# def _wrap_limiter(func:Callable)->Callable:
+#     @wraps(func)
+#     def wrapper(*args, **kwargs):
+#         had_request = False
+#         for k, v in                 
+#         result = func(*args, **kwargs)                
+#         return result
+#     return wrapper
+
 def limiter(rule:str, *, key:Callable|str=None):
     if key is None:
         # key = 'ip'
@@ -120,17 +129,38 @@ def limiter(rule:str, *, key:Callable|str=None):
         return _limiter.limit(rule)
 
 
-@WebContext.Event.on_loaded
+@WebContext.Event.on_started
 def init_error_handler(app:FastAPI):
+    
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exc:HTTPException):
+        _logger.ERROR(f'处理HttpExpcetion: {exc}', exc)
+        return CustomJSONResponse(            
+            status_code=exc.status_code,
+            # content={"code": exc.status_code, "message": exc.detail}
+            content=ReponseVO(False, code=exc.status_code, msg=exc.detail, data=exc.detail)
+        )
+        
+    
+    @app.exception_handler(Exception)
+    async def exception_handler(request: Request, exc:Exception):
+        _logger.ERROR(f'处理Expcetion: {exc}', exc)
+        code = getattr(exc, 'code') if hasattr(exec, 'code') else 500
+        return CustomJSONResponse(
+            status_code=code,
+            # content={"code": exc.status_code, "message": exc.detail}
+            content=ReponseVO(False, code=code, msg=exc.__str__(), data=exc.__str__())
+        )
+              
     # 覆盖 HTTPException
     @app.exception_handler(StarletteHTTPException)
-    async def http_exception_handler(request: Request, exc:StarletteHTTPException):
+    async def http_fastapi_exception_handler(request: Request, exc:StarletteHTTPException):
         return CustomJSONResponse(
             status_code=exc.status_code,
             # content={"code": exc.status_code, "message": exc.detail}
             content=ReponseVO(False, code=exc.status_code, msg=exc.detail, data=exc.detail)
         )
-
+  
     # 覆盖校验错误
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc:RequestValidationError):

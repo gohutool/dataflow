@@ -5,6 +5,7 @@ from typing import Callable
 import functools
 from dataflow.utils.utils import str_isEmpty,str_strip,json_to_str
 from dataflow.utils.sign import b64_encode
+from fastapi import Request
 
 prefix = 'context.redis'
 
@@ -33,9 +34,13 @@ class RedisContext:
                     if single:
                         k = rs_prefix
                     else:
-                        param = {}                        
-                        param.update(kwargs)
-                        param.pop('request', None)
+                        param = {}          
+                        # param.update(kwargs)
+                        # param.pop('request', None)
+                        for k, v in kwargs.items():
+                            if isinstance(v, Request):
+                                continue
+                            param[k] = v
                         
                         k = rs_prefix+':'+b64_encode(json_to_str(param))
                     result = t.getObject(k)
@@ -60,9 +65,10 @@ class RedisContext:
 def _init_redis_context(config):
     c = config
     if c:
+        _logger.INFO(f'初始化Redis源{prefix}[{c}]开始')
         r = initRedisWithConfig(c)            
         Context.getContext().registerBean(prefix, r)
-        _logger.INFO(f'初始化Redis源{prefix}[{c}]={r}')      
+        _logger.INFO(f'初始化Redis源{prefix}[{c}]={r}结束')      
         RedisContext.ENABLED = True  
     else:
         _logger.INFO('没有配置Redis源，跳过初始化')

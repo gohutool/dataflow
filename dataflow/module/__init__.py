@@ -1,10 +1,10 @@
 from dataflow.utils.log import Logger
 from dataflow.utils.reflect import loadlib_by_path
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from typing import Callable
 from functools import wraps
 from dataflow.utils.config import YamlConfigation
-
+import contextvars
 
 _logger = Logger('module.context')
 
@@ -107,7 +107,7 @@ class Context:
         
     
     @staticmethod
-    def Start_Context(*,app:FastAPI=None, application_yaml:str='conf/application.yaml', scan:str='dataflow.application'):
+    def Start_Context(app:FastAPI=None, application_yaml:str='conf/application.yaml', scan:str='dataflow.application'):
         if _contextContainer._webcontext is None:            
             WebContext.initContext(app)         
             
@@ -150,9 +150,19 @@ class Context:
             return wrapper
         return decorator
         
-
+# 定义一个上下文变量
+_current_requst_context = contextvars.ContextVar('_current_requst_context', default=None)
 
 class WebContext:     
+    @staticmethod
+    def getRequest()->Request:
+        return _current_requst_context.get()
+    @staticmethod
+    def setRequest(request:Request):
+        _current_requst_context.set(request)
+    @staticmethod
+    def resetRequest():
+        _current_requst_context.set(None)
     class Event:
         @staticmethod
         def on_loaded(func):

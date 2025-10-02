@@ -18,9 +18,10 @@ class MilvusContext:
 def _init_redis_context(config):
     c = config
     if c:
+        _logger.INFO(f'初始化Milvus源{prefix}[{c}]开始') 
         r = initMilvusWithConfig(c)            
         Context.getContext().registerBean(prefix, r)
-        _logger.INFO(f'初始化Milvus源{prefix}[{c}]={r}') 
+        _logger.INFO(f'初始化Milvus源{prefix}[{c}]={r}结束') 
     else:
         _logger.INFO('没有配置Milvus源，跳过初始化')
 

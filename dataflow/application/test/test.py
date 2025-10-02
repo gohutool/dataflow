@@ -2,7 +2,7 @@ from dataflow.utils.utils import current_millsecond, ReponseVO, date_datetime_cn
 from dataflow.utils.web.asgi import get_remote_address
 from dataflow.module import Context,WebContext
 from dataflow.utils.log import Logger
-from fastapi import FastAPI, Request, status # noqa: F401
+from fastapi import FastAPI, Request, status, HTTPException # noqa: F401
 from fastapi.responses import JSONResponse
 from dataflow.module.context.web import filter, limiter
 from dataflow.module.context.redis import RedisContext
@@ -33,7 +33,31 @@ async def test_endpoint(request:Request):
 async def test_redis_cache(request:Request, itemid:str):
     _logger.INFO('测试Redis_Cache组件')
     return ReponseVO(data={"itemid":itemid, "time":date_datetime_cn()})
-    
+
+@app.get("/test/exception")
+async def test_exception(request:Request):
+    _logger.INFO('测试Exception异常')
+    raise Exception('测试Exception异常')
+
+@app.api_route("/test/httpexception", methods=["GET", "POST"])
+async def test_httpexception(request:Request):
+    _logger.INFO('测试HttpException异常')
+    raise HTTPException(501, detail='测试HttpException异常')
+
+
+@app.get("/test/context_value")
+async def test_context_value(request:Request):
+    _logger.INFO('测试Value组件')
+    return ReponseVO(data=Context.Value('${env:LANGFUSE.secret_key:1-sk-lf-b60f4b33-ff5a-46ac-9086-e776373c86da}'))
+
+
+@app.get("/test/getrequest")
+async def test_get_request():
+    _logger.INFO('测试获取Request组件')
+    request = WebContext.getRequest()
+    return ReponseVO(data={"base_url":request.base_url, 
+                           'method': request.method})
+        
 @filter(path='/test,/test/**')
 async def costtime_handler(request: Request, call_next):
     # ====== 请求阶段 ======
@@ -48,7 +72,7 @@ async def costtime_handler(request: Request, call_next):
     cost = (current_millsecond() - start)
     
     ip = get_remote_address(request)
-    response.headers["X-Cost-ms"] = str(cost)
+    response.headers["test-Cost-ms"] = str(cost)
     _logger.INFO(f"测试过滤器==[{request.url}][{ip}] {response.status_code} {cost:.2f}ms")
     return response    
 

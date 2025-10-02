@@ -53,6 +53,6 @@ _logger = Logger()
 
 if __name__ == "__main__":
     _logger.INFO(f"{_c.getStr('application.name', 'DataFlow Application')} {_c.getStr('application.version', '1.0.0')} Start server on {host}:{port}")
-    uvicorn.run("dataflow.router.endpoint:app", host=host, port=port, reload=False, workers=1)
+    uvicorn.run("dataflow.router.endpoint:app", host=host, port=port, reload=False, workers=1, headers=[("Server", "my-server/1.0")])
     _logger.INFO(f"{_c.getStr('application.name', 'DataFlow Application')} {_c.getStr('application.version', '1.0.0')} End server on {host}:{port}")  
 

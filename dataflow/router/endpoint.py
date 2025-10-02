@@ -13,6 +13,7 @@ from dataflow.module import Context, WebContext
 
 _logger = Logger('router.endpoint')
 
+
 # 定义 lifespan 上下文管理器
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,8 +31,7 @@ Init_fastapi_jsonencoder_plus()
 app = FastAPI(lifespan=lifespan,
               title="DataFlow API",  
             #   default_response_class=CustomJSONResponse,            
-              version="1.0.0")
-
+              version="1.0.0")       
     
 @Context.Context(app=app, scan='dataflow.application.**')
 def initApp(app:FastAPI):
@@ -53,30 +53,26 @@ def initApp(app:FastAPI):
     async def xid_handler(request: Request, call_next):
         # ====== 请求阶段 ======
         start = current_millsecond()
+        
         rid = uuid.uuid4().hex
         request.state.xid = rid    
+        ip = get_ipaddr(request)
+        
         _logger.INFO(f"[{rid}] {request.method} {request.url}")
         
+        WebContext.setRequest(request)        
         response = await call_next(request)
-        response.headers["X-Request-ID"] = rid        
-        response.headers["server"] = 'Tomcat-10.0.x'
+        WebContext.resetRequest()
+                
         # ====== 响应阶段 ======
         cost = (current_millsecond() - start)
-        ip = get_ipaddr(request)
+        response.headers["X-Request-ID"] = rid      
+        response.headers["X-Cost-ms"] = str(cost)                      
+        
         _logger.INFO(f"[{request.url}][{ip}] {response.status_code} {cost:.2f}ms")
         return response        
     _logger.DEBUG(f'添加过滤器装饰器={xid_handler}')
-         
-    # app.add_middleware(
-    #     CORSMiddleware,
-    #     # **opts
-    #     # # allow_origins=origins,
-    #     allow_origins=["*"],
-    #     # allow_credentials=True,
-    #     allow_methods=["*"],
-    #     allow_headers=["*"],
-    # )
-    # _logger.DEBUG(f'添加CORS过滤器装饰器={CORSMiddleware}成功')     
+             
 
 initApp(app=app)    
 WebContext.Event.emit('started', app)
