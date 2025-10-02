@@ -2,8 +2,8 @@
 from typing import Callable
 from starlette.middleware.base import BaseHTTPMiddleware
 from dataflow.utils.log import Logger
-from dataflow.utils.utils import str_isEmpty,str_strip, ReponseVO, get_list_from_dict, get_bool_from_dict  # noqa: F401
-from dataflow.utils.web.asgi import get_remote_address, CustomJSONResponse
+from dataflow.utils.utils import str_isEmpty,str_strip, ReponseVO, get_list_from_dict, get_bool_from_dict,current_millsecond  # noqa: F401
+from dataflow.utils.web.asgi import get_remote_address, CustomJSONResponse,get_ipaddr
 from dataflow.module import Context, WebContext
 from antpathmatcher import AntPathMatcher
 from fastapi import Request, FastAPI
@@ -12,7 +12,7 @@ from slowapi import Limiter
 from fastapi.exceptions import RequestValidationError,HTTPException
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from functools import wraps
+import uuid
 
 _logger = Logger('module.context.web')
 
@@ -79,7 +79,17 @@ def filter(app:FastAPI=None, *, path:list[str]|str='*', excludes:list[str]|str=N
                     return await call_next(request)
                 else:
                     _logger.DEBUG(f'{request.url.path}被拦截器拦截')
-                    return await func(request, call_next)
+                    try:
+                        return await func(request, call_next)                                
+                    except HTTPException as e:
+                        raise e
+                    except RequestValidationError as e:
+                        raise e
+                    except StarletteHTTPException as e:
+                        raise e
+                    except Exception as e:
+                        raise Context.ContextExceptoin(detail=e.__str__())
+                    
             app.add_middleware(BaseHTTPMiddleware, dispatch=new_func)      
     _logger.DEBUG(f'创建过滤器装饰器={decorator} path={path} excludes={excludes}')
     return decorator
@@ -170,7 +180,6 @@ def init_error_handler(app:FastAPI):
             content=ReponseVO(False, code=422, msg=exc.detail, data=exc.errors)
         )
 
-
 @Context.Configurationable(prefix='context.web.cors')
 def _config_cors_filter(config):
     _logger.DEBUG(f'CORS过滤器装饰器信息=[{config}]')
@@ -196,7 +205,54 @@ def _config_cors_filter(config):
         _logger.DEBUG(f'添加CORS过滤器装饰器[{opts}]={CORSMiddleware}成功')
         
 _config_cors_filter()        
+
+@WebContext.Event.on_started
+def init_web_common_filter(app:FastAPI):    
+    @app.middleware("http")
+    async def wrap_exception_handler(request: Request, call_next):
+        # ====== 请求阶段 ======
+        rid = ''
+        if hasattr(request.state, 'xid'):
+            rid = request.state.xid
+        try:                        
+            response = await call_next(request)
+        except HTTPException as e:
+            raise e
+        except RequestValidationError as e:
+            raise e
+        except StarletteHTTPException as e:
+            raise e
+        except Exception as e:
+            _logger.ERROR(f"[{rid}] {request.method} {request.url}", e)
+            raise Context.ContextExceptoin(detail=e.__str__())
+        
+        _logger.INFO(f"[{rid}] {request.method} {request.url}")        
+        return response    
+    _logger.DEBUG(f'添加过滤器装饰器={wrap_exception_handler}') 
     
+    @app.middleware("http")
+    async def xid_handler(request: Request, call_next):
+        # ====== 请求阶段 ======
+        start = current_millsecond()
+        
+        rid = uuid.uuid4().hex
+        request.state.xid = rid    
+        ip = get_ipaddr(request)
+        
+        _logger.INFO(f"[{rid}] {request.method} {request.url}")
+        
+        WebContext.setRequest(request)        
+        response = await call_next(request)
+        WebContext.resetRequest()
+                
+        # ====== 响应阶段 ======
+        cost = (current_millsecond() - start)
+        response.headers["X-Request-ID"] = rid      
+        response.headers["X-Cost-ms"] = str(cost)                      
+        
+        _logger.INFO(f"[{request.url}][{ip}] {response.status_code} {cost:.2f}ms")
+        return response        
+    _logger.DEBUG(f'添加过滤器装饰器={xid_handler}')  
 
 if __name__ == "__main__":    
     matcher = AntPathMatcher()

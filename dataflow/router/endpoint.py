@@ -1,13 +1,9 @@
 
 # 导入 FastAPI 框架
 from fastapi import FastAPI, Request# noqa: F401
-from dataflow.utils.utils import current_millsecond
-import uuid
 from dataflow.utils.web.asgi import Init_fastapi_jsonencoder_plus
-
 from contextlib import asynccontextmanager
 from dataflow.utils.log import Logger
-from dataflow.utils.web.asgi import get_ipaddr
 from dataflow.module import Context, WebContext
 # from fastapi.middleware.cors import CORSMiddleware
 
@@ -19,7 +15,7 @@ _logger = Logger('router.endpoint')
 async def lifespan(app: FastAPI):
     # 启动时执行的代码
     _logger.INFO("Application startup")
-    Context.Event.emit('started')
+    Context.Event.emit('started', Context.getContext())
     
     yield
     # 关闭时执行的代码
@@ -37,44 +33,6 @@ app = FastAPI(lifespan=lifespan,
 def initApp(app:FastAPI):
     _logger.INFO(f'开始初始化App={app}')
     
-    @app.middleware("http")
-    async def authcheck_handler(request: Request, call_next):
-        # ====== 请求阶段 ======
-        rid = ''
-        if hasattr(request.state, 'xid'):
-            rid = request.state.xid    
-            
-        response = await call_next(request)
-        _logger.INFO(f"[{rid}] {request.method} {request.url}")        
-        return response    
-    _logger.DEBUG(f'添加过滤器装饰器={authcheck_handler}')
-
-    @app.middleware("http")
-    async def xid_handler(request: Request, call_next):
-        # ====== 请求阶段 ======
-        start = current_millsecond()
-        
-        rid = uuid.uuid4().hex
-        request.state.xid = rid    
-        ip = get_ipaddr(request)
-        
-        _logger.INFO(f"[{rid}] {request.method} {request.url}")
-        
-        WebContext.setRequest(request)        
-        response = await call_next(request)
-        WebContext.resetRequest()
-                
-        # ====== 响应阶段 ======
-        cost = (current_millsecond() - start)
-        response.headers["X-Request-ID"] = rid      
-        response.headers["X-Cost-ms"] = str(cost)                      
-        
-        _logger.INFO(f"[{request.url}][{ip}] {response.status_code} {cost:.2f}ms")
-        return response        
-    _logger.DEBUG(f'添加过滤器装饰器={xid_handler}')
-             
-
 initApp(app=app)    
-WebContext.Event.emit('started', app)
-    
+WebContext.Event.emit('started', app)    
     

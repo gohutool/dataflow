@@ -1,5 +1,5 @@
 from importlib import import_module
-from typing import Any, Optional, List
+from typing import Any, Optional, List, Type, get_origin, get_args
 import importlib
 import pkgutil
 from dataflow.utils.log import Logger
@@ -191,6 +191,17 @@ def loadlib_by_path(path: str) -> List:
     walk(root_mod.__path__, base + '.')
     return loaded
 
+def get_fullname(obj:any|Type)->str:
+    if obj is not None and not isinstance(obj, Type):
+        obj = type(obj)
+                
+    full_name = f"{obj.__module__}.{obj.__name__}"
+    return full_name
+
+def get_generic(obj:any)->Type:    
+    return get_origin(obj), get_args(obj)
+    
+
 # 定义原始类型
 primitive_types = (int, float, bool, str, type(None))
 
@@ -214,4 +225,10 @@ if __name__ == '__main__':
     print(f'========== {path}')
     print(loadlib_by_path(path))
     
+    print(get_fullname(''))
+    print(get_fullname(Logger()))
+    print(get_fullname(Logger))
     
+    print(get_generic(list[int]))        # (<class 'list'>, (<class 'int'>,))
+    print(get_generic(dict[str, int]))   # (<class 'dict'>, (<class 'str'>, <class 'int'>))
+    print(get_generic(int))              # (None, ())

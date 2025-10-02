@@ -6,9 +6,29 @@ from fastapi import FastAPI, Request, status, HTTPException # noqa: F401
 from fastapi.responses import JSONResponse
 from dataflow.module.context.web import filter, limiter
 from dataflow.module.context.redis import RedisContext
+from dataflow.utils.dbtools.pydbc import PydbcTools
 
 _logger = Logger('application.test')
 app:FastAPI = WebContext.getRoot()
+
+@Context.service('userService')
+class UerService:
+    pydbc:PydbcTools=Context.Autowired(name='ds01')
+    def getItemInfo(self, item_id:str)->any:
+        return self.pydbc.queryOne('select * from sa_security_realtime_daily where code=:code order by tradedate desc limit 1', {'code':item_id})
+    
+userService = UerService()
+
+class ItemService:
+    userService:UerService=Context.Autowired(name='userService')
+    def getItems(self, item_id:str)->any:
+        return self.userService.getItemInfo(item_id)
+
+ItemService = ItemService()
+
+@Context.Inject
+def getInfos(code, ds01:PydbcTools=Context.Autowired()):
+    return ds01.queryPage('select * from sa_security_realtime_daily where code<>:code order by tradedate', {'code':code}, pagesize=20, page=2)
 
 @Context.Configurationable(prefix='context.test')
 def config_all(config):
@@ -33,6 +53,23 @@ async def test_endpoint(request:Request):
 async def test_redis_cache(request:Request, itemid:str):
     _logger.INFO('测试Redis_Cache组件')
     return ReponseVO(data={"itemid":itemid, "time":date_datetime_cn()})
+
+
+@app.get("/test/service/{itemid}")
+@RedisContext.redis_cache(ttl=60, prefix='cache:data:test:items')
+async def test_service(request:Request, itemid:str):
+    _logger.INFO('测试Service组件')    
+    return ReponseVO(data=userService.getItemInfo(itemid))
+
+@app.get("/test/services/{itemid}")
+async def test_services(request:Request, itemid:str):
+    _logger.INFO('测试Services组件')    
+    return ReponseVO(data=getInfos(itemid))
+
+@app.get("/test/reg_services/{itemid}")
+async def test_services_reg(request:Request, itemid:str):
+    _logger.INFO('测试注册Services组件')    
+    return ReponseVO(data=ItemService.getItems(itemid))
 
 @app.get("/test/exception")
 async def test_exception(request:Request):
@@ -83,8 +120,8 @@ def print_exit_test():
     
 
 @Context.Event.on_started
-def print_start_test():
-    _logger.DEBUG('@Context.Event.on_start======================= 启动程序')
+def print_start_test(context):
+    _logger.DEBUG(f'@Context.Event.on_start======================= 启动程序 {context} ')
     
 
 @Context.Event.on_init

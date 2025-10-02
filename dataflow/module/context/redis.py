@@ -16,7 +16,7 @@ class RedisContext:
     ENABLED:bool = False
     @staticmethod    
     def getTool(ds_name:str=None)->RedisTools:                
-        return Context.getContext().getBean(prefix)
+        return Context.getContext().getBean('redis')
     @staticmethod ## 过期时间（秒）
     def redis_cache(*,ttl:int=None,prefix:str=None,single:bool=False):
         rs_prefix = None
@@ -67,7 +67,7 @@ def _init_redis_context(config):
     if c:
         _logger.INFO(f'初始化Redis源{prefix}[{c}]开始')
         r = initRedisWithConfig(c)            
-        Context.getContext().registerBean(prefix, r)
+        Context.getContext().registerBean('redis', r)
         _logger.INFO(f'初始化Redis源{prefix}[{c}]={r}结束')      
         RedisContext.ENABLED = True  
     else:
