@@ -260,6 +260,9 @@ def json_to_str(obj:any):
     # if has_method(obj, 'dict'):
     #     obj = obj.dict()        
     # return orjson.dumps(obj).decode()
+    
+def get_unique_seq()->int:
+    return int(time.time() * 1000000000000)    
 
 def str_to_json(txt:str)->dict|list:
     return json.loads(txt)

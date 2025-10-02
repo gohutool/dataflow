@@ -3,8 +3,8 @@ from sqlalchemy.pool import QueuePool
 from sqlalchemy.exc import SQLAlchemyError
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import PageResult
-from dataflow.utils.utils import json_to_str, str_isEmpty
-from typing import Any, Dict, Optional, overload
+from dataflow.utils.utils import json_to_str, str_isEmpty, get_unique_seq
+from typing import Any, Dict, Optional,Self
 from cachetools import Cache
 
 _logger = Logger('utils.dbtools.pydbc')
@@ -113,8 +113,8 @@ class PydbcTools:
     #         raise e
     
     def queryMany(self, sql, params:dict=None):
-        _logger.DEBUG(f"[SQL]:{sql}")
-        _logger.DEBUG(f"[Parameter]:{params}")
+        _logger.INFO(f"[SQL]:{sql}")
+        _logger.INFO(f"[Parameter]:{params}")
         try:
             with self.engine.begin() as connection:
                 results = connection.execute(text(sql), params).fetchall()   # 参数为Dict    
@@ -425,8 +425,8 @@ class PydbcTools:
         
         # 构建 SQL 语句
         sql = f'delete from {tablename} {where_sql}'
-        _logger.INFO(f'SQL={sql}')
-        _logger.INFO(f'Paramters={sql_params}')
+        _logger.DEBUG(f'SQL={sql}')
+        _logger.DEBUG(f'Paramters={sql_params}')
         
         with self.engine.begin() as connection:
             try:
@@ -597,6 +597,98 @@ class PydbcTools:
                 self.rollback(connection)
                 _logger.ERROR("[Exception]", e)
                 raise e
+
+
+class SimpleExpression:
+    class ExpressionException(Exception):
+        pass
+    
+    def __init__(self):
+        self.param_context = {}
+        self.sql = ''
+    def Sql(self)->str:
+        return self.sql
+    def Param(self)->dict:
+        return self.param_context
+    def _add(self, add:str, field:str, op:str, param:any)->Self:        
+        if op.upper() not in ['IN', '>', '>=', '<', '<=', '<>', '=']:
+            raise SimpleExpression.ExpressionException(f'不支持操作符{op}')
+        s_k = f'p_{get_unique_seq()}'
+        if self.sql :
+            self.sql += f' {add} {field} {op} :{s_k}'
+        else:
+            self.sql += f'{field} {op} :{s_k}'            
+        self.param_context[s_k] = param
+        return self
+    def AND(self, field:str, op:str, param:any)->Self:
+        return self._add('AND', field, op, param)
+    def OR(self, field:str, op:str, param:any)->Self:
+        return self._add('OR', field, op, param)
+    def AND_ISNULL(self, field:str, nullornot:bool)->Self:
+        return self._addNULL('AND', field, nullornot)
+    def OR_ISNULL(self, field:str, nullornot:bool)->Self:
+        return self._addNULL('OR', field, nullornot)
+    def AND_BETWEEN(self, field:str, value1:any, value2:any)->Self:
+        return self._addBetween('AND', field, value1, value2)
+    def OR_BETWEEN(self, field:str, value1:any, value2:any)->Self:
+        return self._addBetween('OR', field, value1, value2)
+    def AND_IN(self, field:str, values:list[any])->Self:
+        return self._addIn('AND', field, values)
+    def OR_IN(self, field:str, values:list[any])->Self:
+        return self._addIn('OR', field, values)
+    def AND_EXPRESSION(self, field:str, sql2:Self)->Self:
+        return self._addExpression('AND', sql2)
+    def OR_EXPRESSION(self, field:str, sql2:Self)->Self:
+        return self._addExpression('OR', field, sql2)
+    def AND_SQL(self, field:str, sql2:str, param2:dict)->Self:
+        return self._addSQL('AND', sql2, param2)
+    def OR_SQL(self, field:str, sql2:str, param2:dict)->Self:
+        return self._addSQL('OR', sql2, param2)
+    def _addExpression(self, add:str,sql2:Self)->Self:
+        if sql2:
+            if self.sql :
+                self.sql += f' {add} {sql2.sql}'
+            else:
+                self.sql += f' {sql2.sql}'
+            self.param_context.update(sql2.param_context)
+        return self    
+    def _addNULL(self, add:str, field:str, nullornot:bool)->Self:                
+        sql = 'IS NULL' if nullornot else 'IS NOT NULL'
+        if self.sql :
+            self.sql += f' {add} {field} {sql}'
+        else:
+            self.sql += f' {field} {sql}'        
+        return self
+    def _addBetween(self, add:str, field:str, value1:any, value2:any)->Self:                
+        s = get_unique_seq()
+        s_k_1 = f'p_{s}_s'
+        s_k_2 = f'p_{s}_e'
+        if self.sql :
+            self.sql += f' {add} {field} BETWEEN :{s_k_1} AND :{s_k_2}'
+        else:
+            self.sql += f' {field} BETWEEN :{s_k_1} AND :{s_k_2}'        
+        self.param_context[s_k_1]=value1
+        self.param_context[s_k_2]=value2
+        return self    
+    def _addIn(self, add:str, field:str, values:list[any])->Self:
+        if values:
+            s = get_unique_seq()
+            cols = [f':p_{s}_{i}' for i, v in enumerate(values)]
+            [self.param_context.update({f'p_{s}_{i}': v}) for i, v in enumerate(values)]
+            col = ','.join(cols)
+            if self.sql :
+                self.sql += f' {add} {field} IN ({col})'
+            else:
+                self.sql += f' {field} IN ({col})' 
+        return self  
+    def _addSQL(self, add:str, sql2:str, param2:dict)->Self:        
+        if self.sql :
+            self.sql += f' {add} {sql2}'
+        else:
+            self.sql += f' {sql2}'
+        self.param_context.update(param2)
+        return self
+        
         
 # @event.listens_for(engine, "checkout")
 # def on_checkout(dbapi_conn, conn_record, conn_proxy):
@@ -665,6 +757,14 @@ if __name__ == "__main__":
     
     sample1['topen']=NULL
     rtn = p.deleteT('dataflow_test.sa_security_realtime_daily', sample1)
+    print(f'Result={rtn}')
+    
+    exp = SimpleExpression()
+    exp = exp.AND('code','=','920819').AND('price','=',4.25).AND_ISNULL('volume',False)
+    exp = exp.AND_IN('code',['920819','920813'])
+    exp = exp.AND_BETWEEN('tradedate','2025-01-05','2025-01-06')
+    
+    rtn = p.queryMany('select * from dataflow_test.sa_security_realtime_daily where 1=1 AND ' + exp.Sql(), exp.Param())
     print(f'Result={rtn}')
     
     import sys
