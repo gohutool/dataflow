@@ -116,11 +116,11 @@ async def costtime_handler(request: Request, call_next):
 def _print_schedule_event(je:ScheduleContext.Event.JobEvent):
     _logger.DEBUG(f'触发Scheduler事件{je.code}={je}')
     
-# @ScheduleContext.on_Trigger(trigger=ScheduleContext.Event.CronTrigger(second='*/20'))
-def _print_date_info():
-    _logger.DEBUG(f'当前时间==={date2str_yyyymmddhhmmsss(date_datetime_cn())}')
-
-ScheduleContext.getSchduler().add_job(_print_date_info, ScheduleContext.Event.CronTrigger(second='*/20'))
+@ScheduleContext.on_Trigger(trigger=ScheduleContext.Event.CronTrigger(second='*/10'), args=[1,2,3], id='JOB_2')
+@ScheduleContext.on_Trigger(trigger=ScheduleContext.Event.CronTrigger(second='*/30'), kwargs={'a':123}, id='JOB_1')
+def _print_date_info(*args, **kwargs):
+    _logger.DEBUG(f'当前时间==={date2str_yyyymmddhhmmsss(date_datetime_cn())} {args} {kwargs}')
+    
 
 @Context.Event.on_exit
 def print_exit_test():

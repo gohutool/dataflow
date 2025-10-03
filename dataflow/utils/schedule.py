@@ -10,12 +10,16 @@ from dataflow.utils.log import Logger
 import atexit
 from typing import Callable
 import functools
+from dataflow.utils.utils import date_datetime_cn,date2str_yyyymmddhhmmsss
+import time
 
 _logger = Logger('utils.schedule')
 
 
 class ScheduleContext:    
-    Job = s_Job
+    class Job(s_Job):
+        pass
+    
     class Event:        
         class CronTrigger(s_cron.CronTrigger):
             pass
@@ -92,7 +96,7 @@ class ScheduleContext:
                 replace_existing=False, **trigger_args)->any:        
         _logger.DEBUG(f'ScheduleContext添加任务{trigger}={func}')
         return ScheduleContext.getSchduler().add_job(func, trigger, args, kwargs, id, name,
-                                              jobstore, executor, replace_existing, **trigger_args)
+                                              jobstore=jobstore, executor=executor, replace_existing=replace_existing, **trigger_args)
     @staticmethod
     def pause():
         ScheduleContext.getSchduler().pause()
@@ -120,11 +124,25 @@ class ScheduleContext:
             
             job:ScheduleContext.Job = ScheduleContext.add_job(func, trigger, args, kwargs, id, name,
                                               jobstore, executor, replace_existing, **trigger_args)
-            _logger.DEBUG(f'ScheduleContext添加任务事件[{func}]={trigger}[{args},{kwargs}]结束')
+            _logger.DEBUG(f'ScheduleContext添加任务事件{job}[{func}]={trigger}[{args},{kwargs}]结束')
             
             return wrapper            
         return _on_trigger
+    @staticmethod
+    def get_job(job_id, jobstore=None):
+        return ScheduleContext.getSchduler().get_job(job_id, jobstore)
         
     
 ScheduleContext.startContext()    
     
+    
+if __name__ == "__main__":
+    def _print_date_info():
+        _logger.DEBUG(f'当前时间==={date2str_yyyymmddhhmmsss(date_datetime_cn())}')
+        
+    
+    ScheduleContext.add_job(_print_date_info, ScheduleContext.Event.CronTrigger(second='*/20'))
+    
+    while True:
+        time.sleep(1)
+        pass

@@ -10,7 +10,7 @@ __defaul_config = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'simple': {'format': '%(levelname)s:[%(_filename)s:%(_lineno)d][%(name)s] - %(asctime_cn)s - %(message)s'}
+        'simple': {'format': '%(levelname)s:[%(filename)s:%(lineno)d][%(name)s] - %(asctime)s - %(message)s'}
     },
     'handlers': {
         'console': {
