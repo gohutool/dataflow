@@ -1,4 +1,4 @@
-from dataflow.utils.utils import current_millsecond, ReponseVO, date_datetime_cn
+from dataflow.utils.utils import current_millsecond, ReponseVO, date_datetime_cn,date2str_yyyymmddhhmmsss
 from dataflow.utils.web.asgi import get_remote_address
 from dataflow.module import Context,WebContext
 from dataflow.utils.log import Logger
@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from dataflow.module.context.web import filter, limiter
 from dataflow.module.context.redis import RedisContext
 from dataflow.utils.dbtools.pydbc import PydbcTools
+from dataflow.utils.schedule import ScheduleContext
 
 _logger = Logger('application.test')
 app:FastAPI = WebContext.getRoot()
@@ -34,8 +35,6 @@ def getInfos(code, ds01:PydbcTools=Context.Autowired()):
 def config_all(config):
     _logger.DEBUG(f'========={config}')
     pass
-
-config_all()
 
 @app.get("/test")
 @limiter(rule='1/minute')
@@ -113,6 +112,15 @@ async def costtime_handler(request: Request, call_next):
     _logger.INFO(f"测试过滤器==[{request.url}][{ip}] {response.status_code} {cost:.2f}ms")
     return response    
 
+@ScheduleContext.Event.on_Listener(event=ScheduleContext.Event.EVENT_ALL)
+def _print_schedule_event(je:ScheduleContext.Event.JobEvent):
+    _logger.DEBUG(f'触发Scheduler事件{je.code}={je}')
+    
+# @ScheduleContext.on_Trigger(trigger=ScheduleContext.Event.CronTrigger(second='*/20'))
+def _print_date_info():
+    _logger.DEBUG(f'当前时间==={date2str_yyyymmddhhmmsss(date_datetime_cn())}')
+
+ScheduleContext.getSchduler().add_job(_print_date_info, ScheduleContext.Event.CronTrigger(second='*/20'))
 
 @Context.Event.on_exit
 def print_exit_test():

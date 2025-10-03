@@ -31,5 +31,3 @@ def _init_datasource_context(config):
                 _logger.INFO(f'设置默认数据源={pt}')
     else:
         _logger.INFO('没有配置数据源，跳过初始化')
-
-_init_datasource_context()

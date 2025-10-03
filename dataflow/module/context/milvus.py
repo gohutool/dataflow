@@ -11,7 +11,7 @@ _logger = Logger('module.context.milvus')
 class MilvusContext:
     @staticmethod    
     def getTool(ds_name:str=None)->MilvusTools:                
-        return Context.getContext().getBean('milvus')
+        return Context.getContext().要('milvus')
     
 
 @Context.Configurationable(prefix=prefix)
@@ -25,4 +25,3 @@ def _init_redis_context(config):
     else:
         _logger.INFO('没有配置Milvus源，跳过初始化')
 
-_init_redis_context()

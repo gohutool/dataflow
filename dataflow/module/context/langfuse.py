@@ -25,6 +25,4 @@ def _init_langfuse_context(config):
     def _on_exit():
         LangfusePlugin.flush()
 
-_init_langfuse_context()
-
 

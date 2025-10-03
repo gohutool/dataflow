@@ -73,4 +73,3 @@ def _init_redis_context(config):
     else:
         _logger.INFO('没有配置Redis源，跳过初始化')
 
-_init_redis_context()
