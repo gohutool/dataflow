@@ -6,8 +6,192 @@ from dataflow.utils.utils import PageResult
 from dataflow.utils.utils import json_to_str, str_isEmpty, get_unique_seq
 from typing import Any, Dict, Optional,Self
 from cachetools import Cache
+from enum import Enum
+from sqlalchemy.orm import sessionmaker, scoped_session, Session
+from contextlib import contextmanager
+from typing import Callable
+import functools
 
 _logger = Logger('utils.dbtools.pydbc')
+
+class PropagationBehavior(Enum):
+    """事务传播行为"""
+    REQUIRED = "REQUIRED"        # 支持当前事务，如果不存在则创建新事务
+    REQUIRES_NEW = "REQUIRES_NEW" # 总是创建新事务
+    SUPPORTS = "SUPPORTS"        # 支持当前事务，如果不存在则以非事务方式执行
+    NOT_SUPPORTED = "NOT_SUPPORTED" # 以非事务方式执行，挂起当前事务
+    MANDATORY = "MANDATORY"      # 必须存在当前事务，否则抛出异常
+    NEVER = "NEVER"              # 必须不存在事务，否则抛出异常
+    
+class TransactionalManager:
+    """SQLAlchemy 事务管理器"""
+       
+    def __init__(self, engine):
+        self.engine = engine
+        self.Session = scoped_session(sessionmaker(bind=self.engine))
+        self._transaction_stack = []  # 事务栈，用于嵌套事务
+    
+    def get_session(self) -> Session:
+        """获取当前会话"""
+        return self.Session()
+    
+    @contextmanager
+    def transaction_context(self, propagation: PropagationBehavior = PropagationBehavior.REQUIRED):
+        """事务上下文管理器"""
+        session = self.get_session()
+        current_transaction = session.get_transaction()
+        
+        try:
+            # 处理事务传播行为
+            if propagation == PropagationBehavior.REQUIRED:
+                if current_transaction and current_transaction.is_active:
+                    # 加入现有事务
+                    _logger.DEBUG("Joining existing transaction")
+                    self._transaction_stack.append(False)  # 标记为嵌套事务
+                    yield session
+                else:
+                    # 开启新事务
+                    _logger.DEBUG("Starting new REQUIRED transaction")
+                    self._transaction_stack.append(True)
+                    with session.begin():
+                        yield session
+                        
+            elif propagation == PropagationBehavior.REQUIRES_NEW:
+                # 总是开启新事务
+                _logger.DEBUG("Starting REQUIRES_NEW transaction")
+                self._transaction_stack.append(True)
+                with session.begin():
+                    yield session
+                    
+            elif propagation == PropagationBehavior.SUPPORTS:
+                # 支持现有事务，没有则不开启
+                _logger.DEBUG("Using SUPPORTS transaction behavior")
+                self._transaction_stack.append(False)
+                yield session
+                
+            elif propagation == PropagationBehavior.MANDATORY:
+                # 必须存在事务
+                if not current_transaction or not current_transaction.is_active:
+                    raise RuntimeError("No existing transaction found for MANDATORY propagation")
+                _logger.DEBUG("Using existing MANDATORY transaction")
+                self._transaction_stack.append(False)
+                yield session
+                
+            elif propagation == PropagationBehavior.NEVER:
+                # 必须不存在事务
+                if current_transaction and current_transaction.is_active:
+                    raise RuntimeError("Existing transaction found for NEVER propagation")
+                _logger.DEBUG("Executing without transaction (NEVER)")
+                self._transaction_stack.append(False)
+                yield session
+                
+            elif propagation == PropagationBehavior.NOT_SUPPORTED:
+                # 挂起当前事务
+                if current_transaction and current_transaction.is_active:
+                    session.expunge_all()  # 分离所有对象
+                    session.rollback()     # 回滚当前事务但不关闭会话
+                _logger.DEBUG("Executing without transaction (NOT_SUPPORTED)")
+                self._transaction_stack.append(False)
+                yield session
+                
+        except Exception as e:
+            _logger.ERROR(f"Transaction error: {e}")
+            # 只有最外层事务才进行回滚
+            if self._transaction_stack and self._transaction_stack[-1]:
+                session.rollback()
+            raise
+        finally:
+            if self._transaction_stack:
+                self._transaction_stack.pop()
+            # 只有在没有嵌套事务时才移除会话
+            if not self._transaction_stack:
+                self.Session.remove()    
+    
+    @staticmethod
+    def transactional(
+        propagation: PropagationBehavior = PropagationBehavior.REQUIRED,
+        read_only: bool = False,
+        rollback_for: tuple = (Exception,),
+        no_rollback_for: tuple = ()
+    ):
+        """
+        事务装饰器
+        
+        Args:
+            propagation: 事务传播行为
+            read_only: 是否只读事务
+            rollback_for: 遇到这些异常时回滚
+            no_rollback_for: 遇到这些异常时不回滚
+        """
+        def decorator(func: Callable) -> Callable:
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                # 查找事务管理器实例
+                transaction_manager = TransactionalManager._find_transaction_manager(args)
+                if not transaction_manager:
+                    raise ValueError("Transaction manager not found in method arguments")
+                
+                with transaction_manager.transaction_context(propagation) as session:
+                    # 如果方法需要session参数，则注入
+                    if TransactionalManager._function_accepts_session(func):
+                        kwargs['session'] = session
+                    
+                    try:
+                        result = func(*args, **kwargs)
+                        
+                        # 只读事务自动回滚
+                        if read_only and session.in_transaction():
+                            session.rollback()
+                            _logger.DEBUG("Read-only transaction rolled back")
+                        
+                        return result
+                        
+                    except Exception as e:
+                        # 检查异常处理规则
+                        should_rollback = TransactionalManager._should_rollback(e, rollback_for, no_rollback_for)
+                        
+                        if should_rollback and session.in_transaction():
+                            session.rollback()
+                            _logger.DEBUG(f"Transaction rolled back due to: {e}")
+                        
+                        raise
+            
+            return wrapper
+        return decorator
+    
+    @staticmethod    
+    def _should_rollback(exception: Exception, rollback_for: tuple, no_rollback_for: tuple) -> bool:
+        """判断是否应该回滚"""
+        # 首先检查 no_rollback_for
+        for exc_type in no_rollback_for:
+            if isinstance(exception, exc_type):
+                return False
+        
+        # 然后检查 rollback_for
+        for exc_type in rollback_for:
+            if isinstance(exception, exc_type):
+                return True
+        
+        # 默认回滚所有异常
+        return True
+
+    @staticmethod    
+    def _function_accepts_session(func: Callable) -> bool:
+        """检查函数是否接受session参数"""
+        import inspect
+        sig = inspect.signature(func)
+        return 'session' in sig.parameters
+
+    @staticmethod
+    def _find_transaction_manager(args) -> Optional[Self]:
+        """从参数中查找事务管理器"""
+        for arg in args:
+            if hasattr(arg, 'transaction_manager') and isinstance(arg.transaction_manager, TransactionalManager):
+                return arg.transaction_manager
+            if isinstance(arg, TransactionalManager):
+                return arg
+        return None        
+
 
 
 def _setup_monitoring(engine:Engine):
@@ -47,6 +231,7 @@ def _setup_monitoring(engine:Engine):
     @event.listens_for(engine, "soft_invalidate")
     def on_soft_invalidate(dbapi_conn, connection_record, exception):
         _logger.DEBUG(f"⚠️ SOFT_INVALIDATE - 软失效: {id(dbapi_conn)}")
+
 
 INNER_PLACEHOLDER = '_$inner$_'
 INNER_UPDATE_PLACEHOLDER = '_update__'
