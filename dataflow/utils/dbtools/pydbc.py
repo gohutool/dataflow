@@ -193,6 +193,96 @@ class TransactionalManager:
         return None        
 
 
+class SimpleExpression:
+    class ExpressionException(Exception):
+        pass
+    
+    def __init__(self):
+        self.param_context = {}
+        self.sql = ''
+    def Sql(self)->str:
+        return self.sql
+    def Param(self)->dict:
+        return self.param_context.copy()
+    def _add(self, add:str, field:str, op:str, param:any)->Self:        
+        if op.upper() not in ['IN', '>', '>=', '<', '<=', '<>', '=']:
+            raise SimpleExpression.ExpressionException(f'不支持操作符{op}')
+        s_k = f'p_{get_unique_seq()}'
+        if self.sql :
+            self.sql += f' {add} {field} {op} :{s_k}'
+        else:
+            self.sql += f'{field} {op} :{s_k}'            
+        self.param_context[s_k] = param
+        return self
+    def AND(self, field:str, op:str, param:any)->Self:
+        return self._add('AND', field, op, param)
+    def OR(self, field:str, op:str, param:any)->Self:
+        return self._add('OR', field, op, param)
+    def AND_ISNULL(self, field:str, nullornot:bool)->Self:
+        return self._addNULL('AND', field, nullornot)
+    def OR_ISNULL(self, field:str, nullornot:bool)->Self:
+        return self._addNULL('OR', field, nullornot)
+    def AND_BETWEEN(self, field:str, value1:any, value2:any)->Self:
+        return self._addBetween('AND', field, value1, value2)
+    def OR_BETWEEN(self, field:str, value1:any, value2:any)->Self:
+        return self._addBetween('OR', field, value1, value2)
+    def AND_IN(self, field:str, values:list[any])->Self:
+        return self._addIn('AND', field, values)
+    def OR_IN(self, field:str, values:list[any])->Self:
+        return self._addIn('OR', field, values)
+    def AND_EXPRESSION(self, field:str, sql2:Self)->Self:
+        return self._addExpression('AND', sql2)
+    def OR_EXPRESSION(self, field:str, sql2:Self)->Self:
+        return self._addExpression('OR', field, sql2)
+    def AND_SQL(self, field:str, sql2:str, param2:dict)->Self:
+        return self._addSQL('AND', sql2, param2)
+    def OR_SQL(self, field:str, sql2:str, param2:dict)->Self:
+        return self._addSQL('OR', sql2, param2)
+    def _addExpression(self, add:str,sql2:Self)->Self:
+        if sql2:
+            if self.sql :
+                self.sql += f' {add} {sql2.sql}'
+            else:
+                self.sql += f' {sql2.sql}'
+            self.param_context.update(sql2.param_context)
+        return self    
+    def _addNULL(self, add:str, field:str, nullornot:bool)->Self:                
+        sql = 'IS NULL' if nullornot else 'IS NOT NULL'
+        if self.sql :
+            self.sql += f' {add} {field} {sql}'
+        else:
+            self.sql += f' {field} {sql}'        
+        return self
+    def _addBetween(self, add:str, field:str, value1:any, value2:any)->Self:                
+        s = get_unique_seq()
+        s_k_1 = f'p_{s}_s'
+        s_k_2 = f'p_{s}_e'
+        if self.sql :
+            self.sql += f' {add} {field} BETWEEN :{s_k_1} AND :{s_k_2}'
+        else:
+            self.sql += f' {field} BETWEEN :{s_k_1} AND :{s_k_2}'        
+        self.param_context[s_k_1]=value1
+        self.param_context[s_k_2]=value2
+        return self    
+    def _addIn(self, add:str, field:str, values:list[any])->Self:
+        if values:
+            s = get_unique_seq()
+            cols = [f':p_{s}_{i}' for i, v in enumerate(values)]
+            [self.param_context.update({f'p_{s}_{i}': v}) for i, v in enumerate(values)]
+            col = ','.join(cols)
+            if self.sql :
+                self.sql += f' {add} {field} IN ({col})'
+            else:
+                self.sql += f' {field} IN ({col})' 
+        return self  
+    def _addSQL(self, add:str, sql2:str, param2:dict)->Self:        
+        if self.sql :
+            self.sql += f' {add} {sql2}'
+        else:
+            self.sql += f' {sql2}'
+        self.param_context.update(param2)
+        return self
+        
 
 def _setup_monitoring(engine:Engine):
     """设置连接池监控"""        
@@ -298,8 +388,8 @@ class PydbcTools:
     #         raise e
     
     def queryMany(self, sql, params:dict=None):
-        _logger.INFO(f"[SQL]:{sql}")
-        _logger.INFO(f"[Parameter]:{params}")
+        _logger.DEBUG(f"[SQL]:{sql}")
+        _logger.DEBUG(f"[Parameter]:{params}")
         try:
             with self.engine.begin() as connection:
                 results = connection.execute(text(sql), params).fetchall()   # 参数为Dict    
@@ -361,27 +451,27 @@ class PydbcTools:
                         
                 return PageResult(total, pagesize, 1, (total + pagesize - 1)//pagesize, list)
 
-    def update(self, sql, params=None, commit=True):
+    def update(self, sql, params=None):
         _logger.DEBUG(f"[SQL]:{sql}")
         _logger.DEBUG(f"[Parameter]:{params}")
         with self.engine.begin() as connection:
             try:
                 results = connection.execute(text(sql), params)
-                if commit:
-                    connection.commit()
+                
+                connection.commit()
                 return results.rowcount
             except Exception as e:
                 connection.rollback()
                 _logger.ERROR("[Exception]", e)
                 raise e
             
-    def insert(self, sql, params=None, commit=True):
-        return self.update(sql, params, commit)
+    def insert(self, sql, params=None):
+        return self.update(sql, params)
 
-    def delete(self, sql, params=None, commit=True):
-        return self.update(sql, params, commit)
+    def delete(self, sql, params=None):
+        return self.update(sql, params)
         
-    def insertT(self, tablename:str, params:dict=None, commit=True)->int:
+    def insertT(self, tablename:str, params:dict=None)->int:
         if not params:
             _logger.WARN("插入对象不能为空")
             return 0
@@ -430,15 +520,15 @@ class PydbcTools:
                     inserted_id = self._get_last_insert_id(connection, tablename, auto_increment_column)
                     params[auto_increment_column] = inserted_id
                 
-                if commit:
-                    connection.commit()
+                
+                connection.commit()
                 return results.rowcount
             except Exception as e:
                 connection.rollback()
                 _logger.ERROR("[Exception]", e)
                 raise e
         
-    def updateT2(self, tablename:str, obj:dict=None, where:dict=None, condiftion:str=None, commit=True):
+    def updateT2(self, tablename:str, obj:dict=None, where:dict=None, condiftion:str=None):
         if not obj:
             _logger.WARN("更新对象不能为空")
             return 0
@@ -493,21 +583,21 @@ class PydbcTools:
         
         # 构建 SQL 语句
         sql = f'UPDATE {tablename} SET {columns} {where_sql}'
-        _logger.INFO(f'SQL={sql}')
-        _logger.INFO(f'Paramters={sql_params}')
+        _logger.DEBUG(f'SQL={sql}')
+        _logger.DEBUG(f'Paramters={sql_params}')
         
         with self.engine.begin() as connection:
             try:
                 results = connection.execute(text(sql), sql_params)
-                if commit:
-                    connection.commit()
+                
+                connection.commit()
                 return results.rowcount
             except Exception as e:
                 connection.rollback()
                 _logger.ERROR("[Exception]", e)
                 raise e
     
-    def updateT(self, tablename:str, obj:dict=None, condiftion:dict=None, commit=True):
+    def updateT(self, tablename:str, obj:dict=None, condiftion:dict=None,sql:SimpleExpression=None):
         if not obj:
             _logger.WARN("更新对象不能为空")
             return 0
@@ -559,27 +649,35 @@ class PydbcTools:
         if condiftion_data:
             where_columns_placeholders = [f'{self._quote_identifier(col)} {item[0]} {item[1]}' for col,item in condiftion_data.items()]
             where_sql = ' AND '.join(where_columns_placeholders)
+            
+        
+        if sql:
+            if not str_isEmpty(where_sql):
+                where_sql += ' AND '
+            where_sql += sql.Sql()
+            sql_params.update(sql.Param())
+            
         
         if not str_isEmpty(where_sql):
             where_sql = ' WHERE ' + where_sql
         
         # 构建 SQL 语句
         sql = f'UPDATE {tablename} SET {columns} {where_sql}'
-        _logger.INFO(f'SQL={sql}')
-        _logger.INFO(f'Paramters={sql_params}')
+        _logger.DEBUG(f'SQL={sql}')
+        _logger.DEBUG(f'Paramters={sql_params}')
         
         with self.engine.begin() as connection:
             try:
                 results = connection.execute(text(sql), sql_params)
-                if commit:
-                    connection.commit()
+                
+                connection.commit()
                 return results.rowcount
             except Exception as e:
                 connection.rollback()
                 _logger.ERROR("[Exception]", e)
                 raise e
     
-    def deleteT(self, tablename:str, condiftion:dict=None, commit=True):
+    def deleteT(self, tablename:str, condiftion:dict=None, sql:SimpleExpression=None):
         
         # 获取表结构信息
         table_info = self.get_table_info(tablename)
@@ -605,6 +703,12 @@ class PydbcTools:
             where_columns_placeholders = [f'{self._quote_identifier(col)} {item[0]} {item[1]}' for col,item in condiftion_data.items()]
             where_sql = ' AND '.join(where_columns_placeholders)
         
+        if sql:
+            if not str_isEmpty(where_sql):
+                where_sql += ' AND '
+            where_sql += sql.Sql()
+            sql_params.update(sql.Param())
+            
         if not str_isEmpty(where_sql):
             where_sql = ' WHERE ' + where_sql
         
@@ -616,8 +720,8 @@ class PydbcTools:
         with self.engine.begin() as connection:
             try:
                 results = connection.execute(text(sql), sql_params)
-                if commit:
-                    connection.commit()
+                
+                connection.commit()
                 return results.rowcount
             except Exception as e:
                 connection.rollback()
@@ -746,7 +850,7 @@ class PydbcTools:
             _logger.ERROR(f"获取表结构失败: {e}")
             raise e
     
-    def batch(self, sql, paramsList:list[dict|tuple]=None, batchsize:int=100, commit=True):
+    def batch(self, sql, paramsList:list[dict|tuple]=None, batchsize:int=100):
         _logger.DEBUG(f"[SQL]:{sql}")
         _logger.DEBUG(f"[Parameters]:{paramsList}")
         results = 0
@@ -763,117 +867,26 @@ class PydbcTools:
                         count = connection.connection.cursor().executemany(sql, datas)  # 参数为元组    
                         results += count
                         _logger.DEBUG(f'批处理执行{len(datas)}条记录，更新数据{count}')                            
-                        if commit :
-                            # connection.commit()
-                            self.commit(connection)
-                            
+                        
+                        connection.commit()
+                        # self.commit(connection)                            
                         datas.clear()
                 if len(datas) > 0:
                     count = connection.connection.cursor().executemany(sql, datas)  # 参数为元组    
                     results += count
                     _logger.DEBUG(f'批处理执行{len(datas)}条记录，更新数据{count}')                        
-                    if commit :
-                        # connection.commit()
-                        self.commit(connection)
+                    
+                    connection.commit()
+                    # self.commit(connection)
                     
                 return results
             except Exception as e:
-                # connection.rollback()
-                self.rollback(connection)
+                connection.rollback()
+                # self.rollback(connection)
                 _logger.ERROR("[Exception]", e)
                 raise e
 
 
-class SimpleExpression:
-    class ExpressionException(Exception):
-        pass
-    
-    def __init__(self):
-        self.param_context = {}
-        self.sql = ''
-    def Sql(self)->str:
-        return self.sql
-    def Param(self)->dict:
-        return self.param_context.copy()
-    def _add(self, add:str, field:str, op:str, param:any)->Self:        
-        if op.upper() not in ['IN', '>', '>=', '<', '<=', '<>', '=']:
-            raise SimpleExpression.ExpressionException(f'不支持操作符{op}')
-        s_k = f'p_{get_unique_seq()}'
-        if self.sql :
-            self.sql += f' {add} {field} {op} :{s_k}'
-        else:
-            self.sql += f'{field} {op} :{s_k}'            
-        self.param_context[s_k] = param
-        return self
-    def AND(self, field:str, op:str, param:any)->Self:
-        return self._add('AND', field, op, param)
-    def OR(self, field:str, op:str, param:any)->Self:
-        return self._add('OR', field, op, param)
-    def AND_ISNULL(self, field:str, nullornot:bool)->Self:
-        return self._addNULL('AND', field, nullornot)
-    def OR_ISNULL(self, field:str, nullornot:bool)->Self:
-        return self._addNULL('OR', field, nullornot)
-    def AND_BETWEEN(self, field:str, value1:any, value2:any)->Self:
-        return self._addBetween('AND', field, value1, value2)
-    def OR_BETWEEN(self, field:str, value1:any, value2:any)->Self:
-        return self._addBetween('OR', field, value1, value2)
-    def AND_IN(self, field:str, values:list[any])->Self:
-        return self._addIn('AND', field, values)
-    def OR_IN(self, field:str, values:list[any])->Self:
-        return self._addIn('OR', field, values)
-    def AND_EXPRESSION(self, field:str, sql2:Self)->Self:
-        return self._addExpression('AND', sql2)
-    def OR_EXPRESSION(self, field:str, sql2:Self)->Self:
-        return self._addExpression('OR', field, sql2)
-    def AND_SQL(self, field:str, sql2:str, param2:dict)->Self:
-        return self._addSQL('AND', sql2, param2)
-    def OR_SQL(self, field:str, sql2:str, param2:dict)->Self:
-        return self._addSQL('OR', sql2, param2)
-    def _addExpression(self, add:str,sql2:Self)->Self:
-        if sql2:
-            if self.sql :
-                self.sql += f' {add} {sql2.sql}'
-            else:
-                self.sql += f' {sql2.sql}'
-            self.param_context.update(sql2.param_context)
-        return self    
-    def _addNULL(self, add:str, field:str, nullornot:bool)->Self:                
-        sql = 'IS NULL' if nullornot else 'IS NOT NULL'
-        if self.sql :
-            self.sql += f' {add} {field} {sql}'
-        else:
-            self.sql += f' {field} {sql}'        
-        return self
-    def _addBetween(self, add:str, field:str, value1:any, value2:any)->Self:                
-        s = get_unique_seq()
-        s_k_1 = f'p_{s}_s'
-        s_k_2 = f'p_{s}_e'
-        if self.sql :
-            self.sql += f' {add} {field} BETWEEN :{s_k_1} AND :{s_k_2}'
-        else:
-            self.sql += f' {field} BETWEEN :{s_k_1} AND :{s_k_2}'        
-        self.param_context[s_k_1]=value1
-        self.param_context[s_k_2]=value2
-        return self    
-    def _addIn(self, add:str, field:str, values:list[any])->Self:
-        if values:
-            s = get_unique_seq()
-            cols = [f':p_{s}_{i}' for i, v in enumerate(values)]
-            [self.param_context.update({f'p_{s}_{i}': v}) for i, v in enumerate(values)]
-            col = ','.join(cols)
-            if self.sql :
-                self.sql += f' {add} {field} IN ({col})'
-            else:
-                self.sql += f' {field} IN ({col})' 
-        return self  
-    def _addSQL(self, add:str, sql2:str, param2:dict)->Self:        
-        if self.sql :
-            self.sql += f' {add} {sql2}'
-        else:
-            self.sql += f' {sql2}'
-        self.param_context.update(param2)
-        return self
-        
         
 # @event.listens_for(engine, "checkout")
 # def on_checkout(dbapi_conn, conn_record, conn_proxy):
@@ -921,8 +934,8 @@ if __name__ == "__main__":
     sample.pop('high',None)
     sample['low']=NULL    
     sample['tradedate']='2025-01-05'
-    # rtn = p.insertT('dataflow_test.sa_security_realtime_daily', sample)
-    # print(f'Result={rtn}')
+    rtn = p.insertT('dataflow_test.sa_security_realtime_daily', sample)
+    print(f'Result={rtn}')
     
     sample = '''
     {"price":"4.25","changepct":"-0.47","change":"-0.02","volume":"56537","turnover":"24137761.32","amp":"1.17"}
@@ -941,7 +954,7 @@ if __name__ == "__main__":
     print(f'Result={rtn}')
     
     sample1['topen']=NULL
-    rtn = p.deleteT('dataflow_test.sa_security_realtime_daily', sample1)
+    rtn = p.deleteT('dataflow_test.sa_security_realtime_daily', sample1, SimpleExpression().AND('code','=','920819').AND('code','in',['920819','920819']))
     print(f'Result={rtn}')
     
     exp = SimpleExpression()

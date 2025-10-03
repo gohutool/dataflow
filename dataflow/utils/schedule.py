@@ -1,3 +1,4 @@
+from dataflow.utils.log import Logger
 from apscheduler.schedulers.background import BackgroundScheduler
 import apscheduler.triggers.cron as s_cron
 import apscheduler.triggers.base as s_base
@@ -6,7 +7,6 @@ import apscheduler.triggers.combining as s_combining
 import apscheduler.triggers.date as s_date
 import apscheduler.events as s_events
 from apscheduler.job import Job as s_Job
-from dataflow.utils.log import Logger
 import atexit
 from typing import Callable
 import functools
