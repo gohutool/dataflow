@@ -1,5 +1,5 @@
 from importlib import import_module
-from typing import Any, Optional, List, Type, get_origin, get_args
+from typing import Any, Optional, List, Type, get_origin, get_args,Callable,get_type_hints
 import importlib
 import pkgutil
 from dataflow.utils.log import Logger
@@ -209,6 +209,48 @@ def get_methodname(func:callable)->str:
     full_name =  f"{func.__module__}.{func.__qualname__}({params})"
     # full_name = f"{func.__module__}.{func.__qualname__}"    
     return full_name    
+
+# list = *args
+# dict = **kwargs
+def bind_call_parameter(func:Callable, args:list, kwargs:dict, bind_func:Callable, new_params:dict)->tuple[list, dict]:
+    
+    sig = inspect.signature(func)        
+    type_hints = get_type_hints(func)
+    bound = sig.bind_partial(*args, **kwargs)
+    bound.apply_defaults()
+    new_args, new_kwargs = [], {}
+
+    for name, param_value in bound.arguments.items():        
+        param_info = sig.parameters[name]
+        # param_info = sig.parameters[name]        
+        # 获取参数类型
+        _typ = type_hints.get(name)
+        # 实际类型
+        # actual_type = type(param_value)
+        binded = True
+        
+        if name in new_params:
+            if bind_func:
+                binded, value = bind_func(old_value=param_value, type=_typ, name=name, new_value=new_params[name])
+            else:
+                value = new_params[name]
+        else:
+            value = param_value
+                                        
+         # print(f"参数: {param_name}")
+        # print(f"  参数类型: {_typ}")
+        # print(f"  实际类型: {actual_type}")
+        # print(f"  参数种类: {param_info.kind.name}")
+        # print(f"  默认值: {param_info.default if param_info.default != param_info.empty else '无'}")
+        # print(f"  传入值: {param_value}")
+        # 普通参数原样透传
+                
+        if param_info.kind in (inspect.Parameter.POSITIONAL_ONLY,
+                        inspect.Parameter.POSITIONAL_OR_KEYWORD):
+            new_args.append(value)
+        else:
+            new_kwargs[name] = value
+    pass
 
 # 定义原始类型
 primitive_types = (int, float, bool, str, type(None))

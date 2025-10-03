@@ -139,7 +139,7 @@ def limiter(rule:str, *, key:Callable|str=None):
         return _limiter.limit(rule)
 
 
-@WebContext.Event.on_started
+@WebContext.Event.on_loaded
 def init_error_handler(app:FastAPI):
     
     @app.exception_handler(HTTPException)
@@ -184,7 +184,7 @@ def init_error_handler(app:FastAPI):
 def _config_cors_filter(config):
     _logger.DEBUG(f'CORS过滤器装饰器信息=[{config}]')
     
-    @WebContext.Event.on_started
+    @WebContext.Event.on_loaded
     def _init_cros_filter(app:FastAPI):        
         # origins = ["*"]        
         opts = {
@@ -204,9 +204,8 @@ def _config_cors_filter(config):
         )
         _logger.DEBUG(f'添加CORS过滤器装饰器[{opts}]={CORSMiddleware}成功')
         
-_config_cors_filter()        
-
-@WebContext.Event.on_started
+        
+@WebContext.Event.on_loaded
 def init_web_common_filter(app:FastAPI):    
     @app.middleware("http")
     async def wrap_exception_handler(request: Request, call_next):

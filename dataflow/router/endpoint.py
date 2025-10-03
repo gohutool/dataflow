@@ -15,6 +15,7 @@ _logger = Logger('router.endpoint')
 async def lifespan(app: FastAPI):
     # 启动时执行的代码
     _logger.INFO("Application startup")
+    WebContext.Event.emit('post_started', app)
     Context.Event.emit('started', Context.getContext())
     
     yield
@@ -30,9 +31,10 @@ app = FastAPI(lifespan=lifespan,
               version="1.0.0")       
     
 @Context.Context(app=app, scan='dataflow.application.**')
-def initApp(app:FastAPI):
-    _logger.INFO(f'开始初始化App={app}')
+def initApp(app:FastAPI,context1:Context):
+    _logger.INFO(f'开始初始化App={app} {context1}')
     
-initApp(app=app)    
-WebContext.Event.emit('started', app)    
+# initApp(app=app)
+
+WebContext.Event.emit('started', app)
     

@@ -21,6 +21,7 @@ _oninit = []
 
 _web_onloaded = []
 _web_onstarted = []
+_web_on_poststarted = []
 
 class Context:
     class ContextExceptoin(HTTPException):
@@ -172,13 +173,25 @@ class Context:
             
     @staticmethod
     def Context(*,app:FastAPI, application_yaml:str='conf/application.yaml', scan:str='dataflow.application'):                
-        Context.Start_Context(app, application_yaml, scan)
-                
-        def decorator(func: Callable) -> Callable:
+        Context.Start_Context(app, application_yaml, scan)                
+        def decorator(func: Callable) -> Callable:            
+            type_hints = get_type_hints(func)
+            params = {}            
+            for k, v in type_hints.items():
+                _logger.DEBUG(f'设置{k}[{get_fullname(v)}]')
+                if k == 'app' or v == FastAPI:
+                    # print(f'{get_fullname(v)} {v} {FastAPI}')
+                    params[k] = app
+                elif k == 'context' or v == Context:
+                    # print(f'{get_fullname(v)} {v} {Context}')
+                    params[k] = Context.getContext()
+            _logger.DEBUG(f'Context.Start_Context开始执行{get_methodname(func)}')
+            func(**params)            
             @wraps(func)
             def wrapper(*args, **kwargs):                
                 result = func(*args, **kwargs)                
                 return result
+            
             return wrapper
         return decorator
     
@@ -187,6 +200,8 @@ class Context:
         c:YamlConfigation = Context.getContext()._application_config
         config = c.getConfig(prefix)        
         def decorator(func: Callable) -> Callable:
+            _logger.DEBUG(f'配置组件{get_methodname(func)}进行配置调用{config}')
+            func(config)            
             @wraps(func)
             def wrapper(*args, **kwargs):                
                 if config is not None:
@@ -197,7 +212,7 @@ class Context:
                 else:
                     _logger.WARN(f'{prefix}没有对应值，配置函数只能进行配置相关操作，跳过')
                     result = None
-                    #result = func(*args, **kwargs)
+                # result = func(*args, **kwargs)    
                 return result
             return wrapper
         return decorator   
@@ -387,6 +402,11 @@ class WebContext:
             _logger.DEBUG(f'on_loaded增加处理函数{func}')
             
         @staticmethod
+        def on_post_started(func):  #### (app)
+            _web_on_poststarted.append(func)
+            _logger.DEBUG(f'on_post_started增加处理函数{func}')
+            
+        @staticmethod
         def on_started(func):  #### (app)
             _web_onstarted.append(func)
             _logger.DEBUG(f'on_started增加处理函数{func}')
@@ -400,7 +420,9 @@ class WebContext:
             if event.strip().lower()=='loaded':
                 _handlers = _web_onloaded
             elif event.strip().lower()=='started':
-                _handlers = _web_onstarted            
+                _handlers = _web_onstarted      
+            elif event.strip().lower()=='post_started':
+                _handlers = _web_on_poststarted         
             else:
                 return             
             for f in _handlers:
