@@ -13,6 +13,8 @@ import re
 import json
 from pydantic import BaseModel, ConfigDict
 import decimal
+import threading
+from itertools import count
 
 # from pydantic import BaseModel, Field
 
@@ -261,8 +263,14 @@ def json_to_str(obj:any):
     #     obj = obj.dict()        
     # return orjson.dumps(obj).decode()
     
+# 每个线程独享的计数器
+_local = threading.local()    
 def get_unique_seq()->int:
-    return int(time.time() * 1000000000000)    
+    # return int(time.time() * 100000000000000000)    
+    """线程内唯一整数，从 1 开始递增"""
+    if not hasattr(_local, 'cnt'):
+        _local.cnt = count(1)      # 新建迭代器
+    return next(_local.cnt)
 
 def str_to_json(txt:str)->dict|list:
     return json.loads(txt)

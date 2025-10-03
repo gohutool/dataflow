@@ -609,7 +609,7 @@ class SimpleExpression:
     def Sql(self)->str:
         return self.sql
     def Param(self)->dict:
-        return self.param_context
+        return self.param_context.copy()
     def _add(self, add:str, field:str, op:str, param:any)->Self:        
         if op.upper() not in ['IN', '>', '>=', '<', '<=', '<>', '=']:
             raise SimpleExpression.ExpressionException(f'不支持操作符{op}')
@@ -706,7 +706,7 @@ class SimpleExpression:
 # 达梦 DM	dmPython	dm+dmPython://u:p@host:5236/db	国产库
 # KingBase	ksycopg2	kingbase+ksycopg2://u:p@host:54321/db
 
-if __name__ == "__main__":
+if __name__ == "__main__":    
     url = make_url('postgresql+psycopg2://root:12345@host:5432/db?charset=utf8')    
     print(url)
     url = url.set(username='liuyong')
@@ -760,12 +760,31 @@ if __name__ == "__main__":
     print(f'Result={rtn}')
     
     exp = SimpleExpression()
+    exp = exp.AND('code','=','920819')
+    exp = exp.AND('price','=',4.25)
     exp = exp.AND('code','=','920819').AND('price','=',4.25).AND_ISNULL('volume',False)
     exp = exp.AND_IN('code',['920819','920813'])
-    exp = exp.AND_BETWEEN('tradedate','2025-01-05','2025-01-06')
+    exp = exp.AND_BETWEEN('tradedate','2025-01-05','2026-01-06')
+    exp = exp.AND('tradedate','in', ['2025-01-05','2025-01-06','2025-09-30'])
+    # exp = exp.AND('tradedate','in', ('2025-01-05','2025-01-06'))
+    
+    # rtn = p.queryMany('select * from dataflow_test.sa_security_realtime_daily where 1=1 and price = :p_1759451586491851472896 AND tradedate in :p_1759451695196584804352 limit 10', {
+    #     'p_1759451695196584804352':['2025-01-05','2025-01-06','2025-09-30'],
+    #     'p_1759451586491851472896':123
+    # })
+    # print(f'Result1111={rtn}')
+    
+    # print('select * from dataflow_test.sa_security_realtime_daily where 1=1 AND ' + exp.Sql())
+    # print(exp.Param())
     
     rtn = p.queryMany('select * from dataflow_test.sa_security_realtime_daily where 1=1 AND ' + exp.Sql(), exp.Param())
     print(f'Result={rtn}')
+    
+    print(get_unique_seq())
+    print(get_unique_seq())
+    print(get_unique_seq())
+    print(get_unique_seq())
+    print(get_unique_seq())
     
     import sys
     sys.exit()

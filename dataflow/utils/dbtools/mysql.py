@@ -257,6 +257,29 @@ def initMysqlWithYaml(config_file='mysql.yaml')->MysqlTools:
     return initMysqlWithConfig(DB_CONFIG)
 
 
-
+if __name__ == "__main__":
+    mt : MysqlTools = initMysqlWithConfig({      
+        'host': 'localhost',
+        'port': 61306,
+        'user': 'stock_agent',
+        'password': '1qaz2wsx',
+        'db': 'stock_agent',
+        'charset': 'utf8',
+        'autocommit': True,
+        'maxconnections': 20,
+        'mincached': 3,
+        'maxcached': 10
+    })
+    
+    rtn = mt.queryMany('select * from dataflow_test.sa_security_realtime_daily where 1=1 AND tradedate in %(p_1759450992799135563776)s limit 10',{
+        'p_1759450992799135563776':['2025-01-05','2025-01-06','2025-09-30']
+    })
+    print(f'Result={rtn}')
+    
+    rtn = mt.queryMany('select * from dataflow_test.sa_security_realtime_daily where 1=1 AND tradedate in %(one)s limit 10', {
+        'one':['2025-01-05','2025-01-06']
+    })
+    print(f'Result={rtn}')
+    
 
 
