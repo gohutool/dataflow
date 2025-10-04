@@ -124,7 +124,14 @@ class Context:
     def getConfigContext(self)->YamlConfigation:
         return self._application_config            
     
-    def registerBean(self, service_name, service):
+    def registerBean(self, service_name, service, override:bool=True):
+        if not override:
+            if Context.SERVICE_PREFIX + '.' + service_name in self._CONTEXT:
+                raise Exception(f'{service}已经存在，注册组件时可以设置override=True进行覆盖')
+        else:
+            if Context.SERVICE_PREFIX + '.' + service_name in self._CONTEXT:
+                _logger.WARN(f'{service}已经存在,可能影响原有注册服务行为')
+                
         self._CONTEXT[Context.SERVICE_PREFIX + '.' + service_name] = service
         _logger.INFO(f'注册服务{service_name}={service}') 
     
@@ -249,7 +256,7 @@ class Context:
                 impl = cls()
                 service_name = name.strip() if not str_isEmpty(name) else t_name
                 Context.getContext().registerBean(service_name, impl)
-                Context.getContext().registerBean(t_name, impl)
+                Context.getContext().registerBean(t_name, impl, True)
                 _logger.DEBUG(f'Service注册服务类实例{service_name},{t_name}={impl}成功')
                 return cls  # 返回原类，不影响后续继承/使用
             
@@ -265,7 +272,7 @@ class Context:
                         service_name = name.strip() if not str_isEmpty(name) else t_name
                         impl = rtn 
                         Context.getContext().registerBean(service_name, impl)
-                        Context.getContext().registerBean(t_name, impl)                    
+                        Context.getContext().registerBean(t_name, impl, True)
                         _logger.DEBUG(f'Service注册服务方法{service_name},{t_name}={impl}')
                     else:
                         raise Exception('Service注解服务方法Func必须返回非原始类型和自定义类对象')
