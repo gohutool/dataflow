@@ -264,6 +264,8 @@ def is_not_primitive(obj):
 # ------------------- demo -------------------
 if __name__ == '__main__':
     
+    _logger.DEBUG('====')
+    
     path = "dataflow.main"
     if len(sys.argv) >=2:
         path = sys.argv[1]

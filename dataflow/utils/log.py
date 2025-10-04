@@ -105,7 +105,7 @@ logging.Logger.error = _err
 
 __defaul_config = {
     'version': 1,
-    'disable_existing_loggers': False,
+    'disable_existing_loggers': True,
     'formatters': {
         'simple': {'format': '%(levelname)s:[%(_filename)s:%(_lineno)d][%(name)s] - %(asctime)s - %(message)s'}
     },
@@ -122,10 +122,10 @@ __defaul_config = {
             'level': 'DEBUG',
         },
     },
-    'root': {          # 全局 logger
-        'handlers': ['console'],
-        'level': 'INFO',
-    }
+    # 'root': {          # 全局 logger
+    #     'handlers': ['console'],
+    #     'level': 'INFO',
+    # }
 }
 
 logging.config.dictConfig(__defaul_config)
@@ -264,3 +264,9 @@ class Logger:
                                          '_full_filename':caller_filename,
                                          'asctime_cn':asctime_cn
                                          })
+            
+            
+# ------------------- demo -------------------
+if __name__ == '__main__':
+    _logger = Logger('utils.log')    
+    _logger.DEBUG('====')            
