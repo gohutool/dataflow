@@ -255,6 +255,9 @@ def bind_call_parameter(func:Callable, args:list, kwargs:dict, bind_func:Callabl
 # 定义原始类型
 primitive_types = (int, float, bool, str, type(None))
 
+def is_user_object(obj):
+    return hasattr(type(obj), '__dict__') and not inspect.isbuiltin(obj)
+
 def is_not_primitive(obj):
     return not isinstance(obj, primitive_types)
 

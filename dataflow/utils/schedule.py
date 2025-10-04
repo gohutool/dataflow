@@ -130,7 +130,16 @@ class ScheduleContext:
         return _on_trigger
     @staticmethod
     def get_job(job_id, jobstore=None):
-        return ScheduleContext.getSchduler().get_job(job_id, jobstore)
+        return ScheduleContext.getSchduler().get_job(job_id, jobstore)        
+    @staticmethod
+    def pause_job(job_id, jobstore=None):        
+        ScheduleContext.getSchduler().pause_job(job_id, jobstore)        
+    @staticmethod
+    def resume_job(job_id, jobstore=None):        
+        ScheduleContext.getSchduler().resume_job(job_id, jobstore)   
+    @staticmethod
+    def reschedule_job(job_id, jobstore=None, trigger=None, **trigger_args):        
+        ScheduleContext.getSchduler().reschedule_job(job_id, jobstore, trigger, **trigger_args)
         
     
 ScheduleContext.startContext()    

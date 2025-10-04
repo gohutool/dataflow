@@ -1,5 +1,5 @@
 from dataflow.utils.log import Logger
-from dataflow.utils.reflect import loadlib_by_path,get_fullname,get_methodname
+from dataflow.utils.reflect import loadlib_by_path,get_fullname,get_methodname,is_not_primitive, is_user_object
 from dataflow.utils.utils import str_isEmpty
 from fastapi import FastAPI, Request, HTTPException
 from typing import Callable,Type,Any,Optional,Dict
@@ -126,7 +126,7 @@ class Context:
     
     def registerBean(self, service_name, service):
         self._CONTEXT[Context.SERVICE_PREFIX + '.' + service_name] = service
-        _logger.INFO(f'注册服务{service_name}={service}成功') 
+        _logger.INFO(f'注册服务{service_name}={service}') 
     
     def getBean(self, service_name):
         k = Context.SERVICE_PREFIX + '.' + service_name
@@ -224,31 +224,60 @@ class Context:
         类装饰器
         :param name: 指定注册名，None 则按类本身注册
         """
-        def decorator(cls):
-            # # 1. 实例化（单例）
-            # sig = inspect.signature(cls)
-            # # 支持构造函数里也有 Autowired 参数            
-            # deps = {}
-            
-            # for param in sig.parameters.values():
-            #     ann = param.annotation
-            #     if ann is not inspect.Parameter.empty:
-            #         if hasattr(ann, '__metadata__'):  # Annotated[T, Autowired(...)]
-            #             meta = ann.__metadata__[0]
-            #             if isinstance(meta, Autowired):
-            #                 deps[param.name] = obtain(meta.key)
-            # impl = cls(**deps) if deps else cls()
+        def decorator(target):
+            if isinstance(target, type):
+                cls = target
+                # _logger.DEBUG(f'Service注册服务类实例{get_fullname(cls)}开始')
+                # # 1. 实例化（单例）
+                # sig = inspect.signature(cls)
+                # # 支持构造函数里也有 Autowired 参数            
+                # deps = {}
+                
+                # for param in sig.parameters.values():
+                #     ann = param.annotation
+                #     if ann is not inspect.Parameter.empty:
+                #         if hasattr(ann, '__metadata__'):  # Annotated[T, Autowired(...)]
+                #             meta = ann.__metadata__[0]
+                #             if isinstance(meta, Autowired):
+                #                 deps[param.name] = obtain(meta.key)
+                # impl = cls(**deps) if deps else cls()
 
-            # # 2. 注册到容器
-            # key = name if name else cls
-            # register(key, impl, singleton=True)
-            t_name = get_fullname(cls)
-            impl = cls()
-            service_name = name.strip() if not str_isEmpty(name) else t_name
-            Context.getContext().registerBean(service_name, impl)
-            Context.getContext().registerBean(t_name, impl)
-            _logger.DEBUG(f'Service注册服务实例{service_name},{t_name}={impl}成功')
-            return cls  # 返回原类，不影响后续继承/使用
+                # # 2. 注册到容器
+                # key = name if name else cls
+                # register(key, impl, singleton=True)
+                t_name = get_fullname(cls)
+                impl = cls()
+                service_name = name.strip() if not str_isEmpty(name) else t_name
+                Context.getContext().registerBean(service_name, impl)
+                Context.getContext().registerBean(t_name, impl)
+                _logger.DEBUG(f'Service注册服务类实例{service_name},{t_name}={impl}成功')
+                return cls  # 返回原类，不影响后续继承/使用
+            
+            elif callable(target):
+                func : Callable = target
+                # _logger.DEBUG(f'Service注册服务方法{get_methodname(func)}开始')
+                
+                rtn = func()
+                
+                if rtn:                
+                    if is_not_primitive(rtn) and is_user_object(rtn):
+                        t_name = get_fullname(rtn)
+                        service_name = name.strip() if not str_isEmpty(name) else t_name
+                        impl = rtn 
+                        Context.getContext().registerBean(service_name, impl)
+                        Context.getContext().registerBean(t_name, impl)                    
+                        _logger.DEBUG(f'Service注册服务方法{service_name},{t_name}={impl}')
+                    else:
+                        raise Exception('Service注解服务方法Func必须返回非原始类型和自定义类对象')
+                else:
+                    raise Exception('Service注解服务方法Func必须返回非空对象')
+                
+                @wraps(func)
+                def wrapper(*args, **kwargs):
+                    result = func(*args, **kwargs)
+                    return result
+                return wrapper # 返回原方法，不影响后续继承/使用
+            
         return decorator
     
     @staticmethod
@@ -457,7 +486,10 @@ def _register_router_for_actuctor(app:FastAPI):
     def actuator_infos():
         rtn = {}
         for k, v in Context.getContext()._CONTEXT.copy().items():
-            rtn[k] = get_fullname(v)
+            rtn[k] = {
+                'service_name':get_fullname(v),
+                'service_instance':str(v)
+            }
         return rtn
     
     @app.get('/actuator/info/{itemid}')

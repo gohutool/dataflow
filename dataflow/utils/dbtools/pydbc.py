@@ -395,7 +395,10 @@ class PydbcTools:
                 results = connection.execute(text(sql), params).fetchall()   # 参数为Dict    
                 rtn = []
                 for one in results:
-                    rtn.append(one._asdict())                
+                    if one:
+                        rtn.append(one._asdict())                
+                    else:
+                        rtn.append(None)
                 return rtn
         except Exception as e:
             _logger.ERROR("[Exception]", e)
@@ -407,7 +410,10 @@ class PydbcTools:
         try:
             with self.engine.begin() as connection:
                 results = connection.execute(text(sql), params).fetchone()   # 参数为Dict                    
-                return results._asdict()
+                if results:
+                    return results._asdict()
+                else:
+                    return None
         except Exception as e:
             _logger.ERROR("[Exception]", e)
             raise e

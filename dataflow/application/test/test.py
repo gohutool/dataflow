@@ -23,9 +23,20 @@ userService = UerService()
 class ItemService:
     userService:UerService=Context.Autowired(name='userService')
     def getItems(self, item_id:str)->any:
+        _logger.DEBUG(f'调用Itemservice={self.name}')
         return self.userService.getItemInfo(item_id)
+    def __init__(self, name):
+        self.name = name
 
-ItemService = ItemService()
+itemService = ItemService('NoName')
+
+@Context.service('itemService2')
+def getItemService2():
+    return ItemService('2')
+
+@Context.service('itemService1')
+def getItemService1():
+    return ItemService('1')
 
 @Context.Inject
 def getInfos(code, ds01:PydbcTools=Context.Autowired()):
@@ -68,7 +79,20 @@ async def test_services(request:Request, itemid:str):
 @app.get("/test/reg_services/{itemid}")
 async def test_services_reg(request:Request, itemid:str):
     _logger.INFO('测试注册Services组件')    
-    return ReponseVO(data=ItemService.getItems(itemid))
+    return ReponseVO(data=itemService.getItems(itemid))
+
+@app.get("/test/itemservice1/{itemid}")
+async def test_itemservice1(request:Request, itemid:str):
+    _logger.INFO('测试注册ItemService1组件')    
+    _is:ItemService = Context.getContext().getBean('itemService1')
+    return ReponseVO(data=_is.getItems(itemid))
+
+
+@app.get("/test/itemservice2/{itemid}")
+async def test_itemservice2(request:Request, itemid:str):
+    _logger.INFO('测试注册ItemService2组件')    
+    _is:ItemService = Context.getContext().getBean('itemService2')
+    return ReponseVO(data=_is.getItems(itemid))
 
 @app.get("/test/exception")
 async def test_exception(request:Request):
