@@ -4,26 +4,16 @@ from sqlalchemy.exc import SQLAlchemyError
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import PageResult
 from dataflow.utils.utils import json_to_str, str_isEmpty, get_unique_seq,current_millsecond
-from typing import Any, Dict, Optional,Self
+from typing import Any, Dict, Optional,Self,Callable,Union,Type,Tuple
 from cachetools import Cache
 from enum import Enum
 from sqlalchemy.orm import sessionmaker
-from typing import Callable
 import functools
-from sqlalchemy.orm import sessionmaker
+import contextvars
+import sys
+import inspect as inspectoin
 
 _logger = Logger('utils.dbtools.pydbc')
-
-class PropagationBehavior(Enum):
-    """事务传播行为"""
-    REQUIRED = "REQUIRED"        # 支持当前事务，如果不存在则创建新事务
-    REQUIRES_NEW = "REQUIRES_NEW" # 总是创建新事务
-    SUPPORTS = "SUPPORTS"        # 支持当前事务，如果不存在则以非事务方式执行
-    NOT_SUPPORTED = "NOT_SUPPORTED" # 以非事务方式执行，挂起当前事务
-    MANDATORY = "MANDATORY"      # 必须存在当前事务，否则抛出异常
-    NEVER = "NEVER"              # 必须不存在事务，否则抛出异常
-    
-
 
 class SimpleExpression:
     class ExpressionException(Exception):
@@ -190,7 +180,7 @@ class PydbcTools:
             
             future=True            
         )
-        self._sessoin_factory = sessionmaker(bind=self.engine, expire_on_commit=False)
+        self._sessoin_factory = SessionFactory(self)
         _setup_monitoring(self.engine)        
         # _logger.INFO(f'创建数据库连接:{self.__url}')               
         if 'test' in self.__config__:
@@ -224,25 +214,26 @@ class PydbcTools:
         _logger.DEBUG(f"[Parameter]:{params}")
         try:
             
-            # with self.engine.begin() as connection:
-            #     results = connection.execute(text(sql), params).fetchall()   # 参数为Dict    
-            #     rtn = []
-            #     for one in results:
-            #         if one:
-            #             rtn.append(one._asdict())                
-            #         else:
-            #             rtn.append(None)
-            #     return rtn
-            
-            with self._sessoin_factory() as session:
-                results = session.execute(text(sql), params).fetchall()   # 参数为Dict    
-                rtn = []
-                for one in results:
-                    if one:
-                        rtn.append(one._asdict())                
-                    else:
-                        rtn.append(None)
-                return rtn
+            if not self._sessoin_factory.getSession():
+                with self.engine.begin() as connection:
+                    results = connection.execute(text(sql), params).fetchall()   # 参数为Dict    
+                    rtn = []
+                    for one in results:
+                        if one:
+                            rtn.append(one._asdict())                
+                        else:
+                            rtn.append(None)
+                    return rtn
+            else:
+                with self._sessoin_factory.getSession() as session:
+                    results = session.execute(text(sql), params).fetchall()   # 参数为Dict    
+                    rtn = []
+                    for one in results:
+                        if one:
+                            rtn.append(one._asdict())                
+                        else:
+                            rtn.append(None)
+                    return rtn
             
         except Exception as e:
             _logger.ERROR("[Exception]", e)
@@ -252,19 +243,20 @@ class PydbcTools:
         _logger.DEBUG(f"[SQL]:{sql}")
         _logger.DEBUG(f"[Parameter]:{params}")
         try:
-            # with self.engine.begin() as connection:
-            #     results = connection.execute(text(sql), params).fetchone()   # 参数为Dict                    
-            #     if results:
-            #         return results._asdict()
-            #     else:
-            #         return None
-                
-            with self._sessoin_factory() as session:
-                results = session.execute(text(sql), params).fetchone()   # 参数为Dict                    
-                if results:
-                    return results._asdict()
-                else:
-                    return None
+            if not self._sessoin_factory.getSession():
+                with self.engine.begin() as connection:
+                    results = connection.execute(text(sql), params).fetchone()   # 参数为Dict                    
+                    if results:
+                        return results._asdict()
+                    else:
+                        return None
+            else:
+                with self._sessoin_factory.getSession() as session:
+                    results = session.execute(text(sql), params).fetchone()   # 参数为Dict                    
+                    if results:
+                        return results._asdict()
+                    else:
+                        return None
                 
         except Exception as e:
             _logger.ERROR("[Exception]", e)
@@ -312,24 +304,26 @@ class PydbcTools:
     def update(self, sql, params=None):
         _logger.DEBUG(f"[SQL]:{sql}")
         _logger.DEBUG(f"[Parameter]:{params}")
-        # with self.engine.begin() as connection:
-        #     try:
-        #         results = connection.execute(text(sql), params)
-                
-        #         connection.commit()
-        #         return results.rowcount
-        #     except Exception as e:
-        #         connection.rollback()
-        #         _logger.ERROR("[Exception]", e)
-        #         raise e
-            
-        with self._sessoin_factory() as connection:
-            try:
-                results = connection.execute(text(sql), params)                
-                return results.rowcount
-            except Exception as e:
-                _logger.ERROR("[Exception]", e)
-                raise e
+        
+        if not self._sessoin_factory.getSession():
+            with self.engine.begin() as connection:
+                try:
+                    results = connection.execute(text(sql), params)
+                    
+                    connection.commit()
+                    return results.rowcount
+                except Exception as e:
+                    connection.rollback()
+                    _logger.ERROR("[Exception]", e)
+                    raise e
+        else:                
+            with self._sessoin_factory.getSession() as connection:
+                try:
+                    results = connection.execute(text(sql), params)                
+                    return results.rowcount
+                except Exception as e:
+                    _logger.ERROR("[Exception]", e)
+                    raise e
             
     def insert(self, sql, params=None):
         return self.update(sql, params)
@@ -377,36 +371,37 @@ class PydbcTools:
         _logger.DEBUG(f'SQL={sql}')
         _logger.DEBUG(f'Paramters={valided_data}')
         
-        # with self.engine.begin() as connection:
-        #     try:
-        #         results = connection.execute(text(sql), valided_data)                    
-        #         # 获取自增长ID
-        #         inserted_id = None
-        #         if auto_increment_column:
-        #             inserted_id = self._get_last_insert_id(connection, tablename, auto_increment_column)
-        #             params[auto_increment_column] = inserted_id
-                
-                
-        #         connection.commit()
-        #         return results.rowcount
-        #     except Exception as e:
-        #         connection.rollback()
-        #         _logger.ERROR("[Exception]", e)
-        #         raise e
-            
-        with self._sessoin_factory() as connection:
-            try:
-                results = connection.execute(text(sql), valided_data)                    
-                # 获取自增长ID
-                inserted_id = None
-                if auto_increment_column:
-                    inserted_id = self._get_last_insert_id(connection, tablename, auto_increment_column)
-                    params[auto_increment_column] = inserted_id
-                                    
-                return results.rowcount
-            except Exception as e:
-                _logger.ERROR("[Exception]", e)
-                raise e
+        if not self._sessoin_factory.getSession():
+            with self.engine.begin() as connection:
+                try:
+                    results = connection.execute(text(sql), valided_data)                    
+                    # 获取自增长ID
+                    inserted_id = None
+                    if auto_increment_column:
+                        inserted_id = self._get_last_insert_id(connection, tablename, auto_increment_column)
+                        params[auto_increment_column] = inserted_id
+                    
+                    
+                    connection.commit()
+                    return results.rowcount
+                except Exception as e:
+                    connection.rollback()
+                    _logger.ERROR("[Exception]", e)
+                    raise e
+        else:
+            with self._sessoin_factory.getSession() as connection:
+                try:
+                    results = connection.execute(text(sql), valided_data)                    
+                    # 获取自增长ID
+                    inserted_id = None
+                    if auto_increment_column:
+                        inserted_id = self._get_last_insert_id(connection, tablename, auto_increment_column)
+                        params[auto_increment_column] = inserted_id
+                                        
+                    return results.rowcount
+                except Exception as e:
+                    _logger.ERROR("[Exception]", e)
+                    raise e
         
     def updateT2(self, tablename:str, obj:dict=None, where:dict=None, condiftion:str=None):
         if not obj:
@@ -744,58 +739,250 @@ class PydbcTools:
         if paramsList is None or len(paramsList)==0:
             return 0
         
-        # with self.engine.begin() as connection:
-        #     try:
-        #         datas = []
-        #         for params in paramsList:                                            
-        #             datas.append(params)
-        #             if len(datas) >= batchsize:
-        #                 count = connection.connection.cursor().executemany(sql, datas)  # 参数为元组    
-        #                 results += count
-        #                 _logger.DEBUG(f'批处理执行{len(datas)}条记录，更新数据{count}')                            
-                        
-        #                 connection.commit()
-        #                 # self.commit(connection)                            
-        #                 datas.clear()
-        #         if len(datas) > 0:
-        #             count = connection.connection.cursor().executemany(sql, datas)  # 参数为元组    
-        #             results += count
-        #             _logger.DEBUG(f'批处理执行{len(datas)}条记录，更新数据{count}')                        
-                    
-        #             connection.commit()
-        #             # self.commit(connection)
-                    
-        #         return results
-        #     except Exception as e:
-        #         connection.rollback()
-        #         # self.rollback(connection)
-        #         _logger.ERROR("[Exception]", e)
-        #         raise e
-            
-        with self._sessoin_factory() as connection:
-            try:
-                datas = []
-                for params in paramsList:                                            
-                    datas.append(params)
-                    if len(datas) >= batchsize:
-                        count = connection.connection().connection.cursor().executemany(sql, datas)  # 参数为元组    
+        if not self._sessoin_factory.getSession():
+            with self.engine.begin() as connection:
+                try:
+                    datas = []
+                    for params in paramsList:                                            
+                        datas.append(params)
+                        if len(datas) >= batchsize:
+                            count = connection.connection.cursor().executemany(sql, datas)  # 参数为元组    
+                            results += count
+                            _logger.DEBUG(f'批处理执行{len(datas)}条记录，更新数据{count}')                            
+                            
+                            connection.commit()
+                            # self.commit(connection)                            
+                            datas.clear()
+                    if len(datas) > 0:
+                        count = connection.connection.cursor().executemany(sql, datas)  # 参数为元组    
                         results += count
                         _logger.DEBUG(f'批处理执行{len(datas)}条记录，更新数据{count}')                        
-                        # self.commit(connection)                            
-                        datas.clear()
-                if len(datas) > 0:
-                    count = connection.connection().connection.cursor().executemany(sql, datas)  # 参数为元组    
-                    results += count
-                    _logger.DEBUG(f'批处理执行{len(datas)}条记录，更新数据{count}')                                            
-                    # self.commit(connection)                    
-                return results
-            except Exception as e:
-                # self.rollback(connection)
-                _logger.ERROR("[Exception]", e)
-                raise e
+                        
+                        connection.commit()
+                        # self.commit(connection)
+                        
+                    return results
+                except Exception as e:
+                    connection.rollback()
+                    # self.rollback(connection)
+                    _logger.ERROR("[Exception]", e)
+                    raise e
+        else:    
+            with self._sessoin_factory.getSession() as connection:
+                try:
+                    datas = []
+                    for params in paramsList:                                            
+                        datas.append(params)
+                        if len(datas) >= batchsize:
+                            count = connection.connection().connection.cursor().executemany(sql, datas)  # 参数为元组    
+                            results += count
+                            _logger.DEBUG(f'批处理执行{len(datas)}条记录，更新数据{count}')                        
+                            # self.commit(connection)                            
+                            datas.clear()
+                    if len(datas) > 0:
+                        count = connection.connection().connection.cursor().executemany(sql, datas)  # 参数为元组    
+                        results += count
+                        _logger.DEBUG(f'批处理执行{len(datas)}条记录，更新数据{count}')                                            
+                        # self.commit(connection)                    
+                    return results
+                except Exception as e:
+                    # self.rollback(connection)
+                    _logger.ERROR("[Exception]", e)
+                    raise e
 
 
+class Propagation(Enum):
+    """事务传播行为"""
+    REQUIRED = "REQUIRED"        # 支持当前事务，如果不存在则创建新事务
+    REQUIRES_NEW = "REQUIRES_NEW" # 总是创建新事务
+    SUPPORTS = "SUPPORTS"        # 支持当前事务，如果不存在则以非事务方式执行
+    NOT_SUPPORTED = "NOT_SUPPORTED" # 以非事务方式执行，挂起当前事务
+    MANDATORY = "MANDATORY"      # 必须存在当前事务，否则抛出异常
+    NEVER = "NEVER"              # 必须不存在事务，否则抛出异常
+
+class SessionFactory:
+    def __init__(self,pydbc:PydbcTools):
+        self._pydbc = pydbc
+        self._session_factory = sessionmaker(bind=self._pydbc.engine, expire_on_commit=False)
+        self._session_stack = contextvars.ContextVar('_current_requst_context', default=None)
+        self._session_stack.set([])
+    def createSession(self):
+        return self._session_factory()
+    def getSession(self, create:bool=False):
+        _s:list = self._session_stack.get()
+        _session = None
+        if _s:
+            _session = _s[-1]
+        else:
+            if create:
+                _session = self._session_factory()
+        _logger.DEBUG(f'获取Session={_session}')
+        return _session            
+    def beginSession(self, session):        
+        _l:list = self._session_stack.get()
+        _l.append(session)        
+    def endSession(self):
+        _l:list = self._session_stack.get()        
+        if _l:
+            _s = _l.pop()
+            return _s
+        else:
+            raise Exception('Session栈已经空，栈溢出')
+
+class TX:
+    def __init__(self, pydbc: PydbcTools,*,propagation:Propagation=Propagation.REQUIRED,rollback_for:Union[Type[Exception], Tuple[Type[Exception], ...]] = Exception):
+        self._session_factory = SessionFactory(pydbc)
+        self._propagation = propagation
+        self._rollback_for = rollback_for if isinstance(rollback_for, tuple) else (rollback_for,)
+    
+    def __call__(self, func: Callable) -> Callable:
+        _logger.DEBUG(f'创建TX装饰器,隔离级别={self._propagation}')
+        return self._async_wrapper(func) if inspectoin.iscoroutinefunction(func) else self._sync_wrapper(func)
+    
+    def _handle_when_expcetion(self, func:Callable, need_end, *args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            session = self._session_factory.getSession()                
+            if session and session.in_transaction():
+                if self._should_rollback(type(e)):
+                    session.rollback()
+                else:
+                    # 对于不需要回滚的异常，尝试提交
+                    try:
+                        session.commit()
+                    except Exception:
+                        # 如果提交失败，则回滚
+                        session.rollback()
+            raise
+        finally:
+            if need_end:
+                self._session_factory.endSession()
+            pass
         
+    async def _async_handle_when_expcetion(self, func:Callable, need_end, *args, **kwargs):
+        try:
+            return await  func(*args, **kwargs)
+        except Exception as e:
+            session = self._session_factory.getSession()                
+            if session and session.in_transaction():
+                if self._should_rollback(type(e)):
+                    session.rollback()
+                else:
+                    # 对于不需要回滚的异常，尝试提交
+                    try:
+                        session.commit()
+                    except Exception:
+                        # 如果提交失败，则回滚
+                        session.rollback()
+            raise
+        finally:
+            if need_end:
+                self._session_factory.endSession()
+            pass
+        
+    def _sync_wrapper(self, func: Callable) -> Callable:
+        _logger.DEBUG('TX装饰器同步模式')
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            need_end = False
+            
+            if self._propagation == Propagation.SUPPORTS:
+                _logger.DEBUG('事务Propagation.SUPPORTS')
+                return self._handle_when_expcetion(func, need_end, *args, **kwargs)
+            elif self._propagation == Propagation.REQUIRES_NEW:
+                cur_session = self._session_factory.createSession()
+                need_end = True                          
+                self._session_factory.beginSession(cur_session)
+                _logger.DEBUG('事务Propagation.REQUIRES_NEW')
+                with cur_session.begin():
+                    return self._handle_when_expcetion(func, need_end, *args, **kwargs)
+            elif self._propagation == Propagation.REQUIRED:
+                cur_session = self._session_factory.getSession()
+                if cur_session is None:
+                    cur_session = self._session_factory.createSession()
+                    need_end = True
+                    self._session_factory.beginSession(cur_session)
+                    _logger.DEBUG('事务Propagation.REQUIRED->NEW')
+                    with cur_session.begin():
+                        return self._handle_when_expcetion(func, need_end, *args, **kwargs)
+                else:
+                    if cur_session.in_transaction:
+                        with cur_session.begin_nested():
+                            _logger.DEBUG('事务Propagation.REQUIRED->USED_CURRENT')
+                            return self._handle_when_expcetion(func, need_end, *args, **kwargs)
+                    else:
+                        _logger.DEBUG('事务Propagation.REQUIRED->USED_CURRENT')
+                        return self._handle_when_expcetion(func, need_end, *args, **kwargs)
+            elif self._propagation == Propagation.NEVER:
+                cur_session = self._session_factory.getSession()
+                if cur_session:
+                    raise Exception('已经启动了事务，NEVER不支持活动事务')   
+            elif self._propagation == Propagation.MANDATORY:
+                cur_session = self._session_factory.getSession()
+                if not cur_session:
+                    raise Exception('没有启动事务，MANDATORY必须已经启动事务')     
+            else:
+                _logger.DEBUG(f'事务级别{self._propagation}')
+                
+            return func(*args, **kwargs) 
+        
+        return wrapper
+    
+    def _async_wrapper(self, func: Callable) -> Callable:
+        _logger.DEBUG('TX装饰器异步模式')
+        @functools.wraps(func)
+        async def wrapper(*args, **kwargs):
+            need_end = False
+            
+            if self._propagation == Propagation.SUPPORTS:
+                _logger.DEBUG('事务Propagation.SUPPORTS')
+                return await self._async_handle_when_expcetion(func, need_end, *args, **kwargs)
+            elif self._propagation == Propagation.REQUIRES_NEW:
+                cur_session = self._session_factory.createSession()
+                need_end = True                          
+                self._session_factory.beginSession(cur_session)
+                _logger.DEBUG('事务Propagation.REQUIRES_NEW')
+                with cur_session.begin():
+                    return await self._async_handle_when_expcetion(func, need_end, *args, **kwargs)
+            elif self._propagation == Propagation.REQUIRED:
+                cur_session = self._session_factory.getSession()
+                if cur_session is None:
+                    cur_session = self._session_factory.createSession()
+                    need_end = True
+                    self._session_factory.beginSession(cur_session)
+                    _logger.DEBUG('事务Propagation.REQUIRED->NEW')
+                    with cur_session.begin():
+                        return await self._async_handle_when_expcetion(func, need_end, *args, **kwargs)
+                else:
+                    if cur_session.in_transaction:
+                        with cur_session.begin_nested():
+                            _logger.DEBUG('事务Propagation.REQUIRED->USED_CURRENT')
+                            return await self._async_handle_when_expcetion(func, need_end, *args, **kwargs)
+                    else:
+                        _logger.DEBUG('事务Propagation.REQUIRED->USED_CURRENT')
+                        return await self._async_handle_when_expcetion(func, need_end, *args, **kwargs)
+            elif self._propagation == Propagation.NEVER:
+                cur_session = self._session_factory.getSession()
+                if cur_session:
+                    raise Exception('已经启动了事务，NEVER不支持活动事务')   
+            elif self._propagation == Propagation.MANDATORY:
+                cur_session = self._session_factory.getSession()
+                if not cur_session:
+                    raise Exception('没有启动事务，MANDATORY必须已经启动事务')     
+            else:
+                _logger.DEBUG(f'事务级别{self._propagation}')
+                
+            return await func(*args, **kwargs) 
+        
+        return wrapper        
+    
+    def _should_rollback(self, exc_type: Type[Exception]) -> bool:
+        """判断是否应该回滚"""
+        # 最后检查 rollback_for
+        return any(issubclass(exc_type, rollback_exc) for rollback_exc in self._rollback_for)
+
+
 # @event.listens_for(engine, "checkout")
 # def on_checkout(dbapi_conn, conn_record, conn_proxy):
 #     print("[池] 取出连接", conn_record)        
@@ -831,7 +1018,6 @@ if __name__ == "__main__":
     print(json_to_str(t))
     
     print(p.get_table_info('dataflow_test.sa_security_realtime_daily'))
-    
     
     sample = '''
     {"id":435177,"tradedate":"2025-09-30","code":"920819","name":"颖泰生物","price":"4.25","changepct":"-0.47","change":"-0.02","volume":"56537","turnover":"24137761.32","amp":"1.17","high":"4.3","low":"4.25","topen":"4.3","lclose":"4.27","qrr":"0.62","turnoverpct":"0.47","pe_fwd":"170.35","pb":"1.02","mc":"5209650000","fmc":"5131906875","roc":"-0.23","roc_5min":"-0.23","changepct_60day":"1.67","changepct_currentyear":"19.72","hot_rank_em":5116,"market":"SZ","createtime":"2025-09-30 09:32:17","updatetime":"2025-09-30 17:06:09","enable":1}
@@ -896,7 +1082,13 @@ if __name__ == "__main__":
     print(get_unique_seq())
     print(get_unique_seq())
     
-    import sys
+    @TX(p)
+    def test_tx():
+        _logger.DEBUG("test_tx ========================")
+        pass
+    
+    test_tx()
+    
     sys.exit()
     
     

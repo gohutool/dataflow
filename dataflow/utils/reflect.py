@@ -155,7 +155,7 @@ def import_lib(base):
     _logger.INFO(f'import_lib-->加载包{base}[{"PKG" if hasattr(mod, '__path__') else "MOD" }] 耗时{cost:.2f}毫秒')
     return mod
 
-def loadlib_by_path(path: str) -> List:
+def loadlib_by_path(path: str|list[str]) -> List:
     """
     按 uvicorn 风格字符串加载包/模块
     返回 [模块对象, ...]

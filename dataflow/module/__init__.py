@@ -103,12 +103,22 @@ class Context:
         return _contextContainer._context
     
     @staticmethod
-    def initContext(applicationConfig_file:str, scan_path:str):
+    def initContext(applicationConfig_file:str, scan_path:str|list[str]):
         _contextContainer._context = Context(applicationConfig_file, scan_path)        
         _logger.INFO(f'实例化容器={_contextContainer._context}')
         _contextContainer._context._parseContext()
         _logger.DEBUG(f'加载模块路径{scan_path}开始')        
-        _modules = loadlib_by_path(_contextContainer._context.scan_path)
+        
+        _m = []
+        
+        if isinstance(scan_path, str):
+            _modules = loadlib_by_path(scan_path)
+            _m += _modules
+        elif isinstance(scan_path, list):
+            for path in scan_path:
+                _modules = loadlib_by_path(path)
+                _m += _modules
+        
         _logger.DEBUG(f'加载模块路径{scan_path}结束')        
         Context.Event.emit('loaded', _contextContainer._context, _modules)
         
@@ -167,7 +177,7 @@ class Context:
         
     
     @staticmethod
-    def Start_Context(app:FastAPI=None, application_yaml:str='conf/application.yaml', scan:str='dataflow.application'):
+    def Start_Context(app:FastAPI=None, application_yaml:str='conf/application.yaml', scan:str|list[str]='dataflow.application'):
         if _contextContainer._webcontext is None:            
             WebContext.initContext(app)         
             
@@ -179,7 +189,7 @@ class Context:
         WebContext.Event.emit('loaded', app)
             
     @staticmethod
-    def Context(*,app:FastAPI, application_yaml:str='conf/application.yaml', scan:str='dataflow.application'):                
+    def Context(*,app:FastAPI, application_yaml:str='conf/application.yaml', scan:str|list[str]='dataflow.application'):
         Context.Start_Context(app, application_yaml, scan)                
         def decorator(func: Callable) -> Callable:            
             type_hints = get_type_hints(func)
