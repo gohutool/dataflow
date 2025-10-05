@@ -5,7 +5,7 @@ from dbutils.pooled_db import PooledDB
 from dataflow.utils.utils import PageResult
 import yaml
 
-_logger = Logger('utils.dbtools.mysql')
+_logger = Logger('dataflow.utils.dbtools.mysql')
 
 # DB_CONFIG = {
 #     'host': '192.168.18.145',

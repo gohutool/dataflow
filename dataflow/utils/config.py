@@ -15,7 +15,7 @@ from omegaconf import OmegaConf
 import threading
 from typing import Self
 
-__logger = Logger('utils.config')
+_logger = Logger('dataflow.utils.config')
 
 
 # Define environment types
@@ -54,7 +54,7 @@ def get_environment() -> Environment:
 def load_env_file():
     """Load environment-specific .env file."""
     env = get_environment()
-    __logger.INFO(f"Loading environment: {env}")
+    _logger.INFO(f"Loading environment: {env}")
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 
     # Define env files in priority order
@@ -69,7 +69,7 @@ def load_env_file():
     for env_file in env_files:
         if os.path.isfile(env_file):
             load_dotenv(dotenv_path=env_file)
-            __logger.INFO(f"Loaded environment from {env_file}")
+            _logger.INFO(f"Loaded environment from {env_file}")
             return env_file
 
     # Fall back to default if no env file found
@@ -97,7 +97,6 @@ class Settings:
         self.DESCRIPTION = os.getenv(
             "DESCRIPTION", "A production-ready FastAPI with DataFlow at AI Agent"
         )     
-        self.__logger = Logger('utils.config')
                      
     def getInt(self, env, dv:Optional[int]=0)->int:
         value = os.getenv(env)
@@ -145,7 +144,7 @@ class Settings:
         
         # Look for all env vars with the given prefix
         for key, value in os.environ.items():
-            self.__logger.DEBUG(f'{key} = {value}')
+            self._logger.DEBUG(f'{key} = {value}')
             if key.startswith(env_prefix):
                 if result is None:
                     result = default_dict or {}
@@ -193,17 +192,16 @@ class YamlConfigation:
         return next(iter(YamlConfigation._MODEL_CACHE.values()))
     
     @staticmethod
-    def loadConfiguration(yaml_path:str=None)->Self:
-        __logger = Logger('utils.config')
+    def loadConfiguration(yaml_path:str=None)->Self:        
         
         if yaml_path in YamlConfigation._MODEL_CACHE:               # 快速路径无锁
-            __logger.WARN('Load Configuration from memory')
+            _logger.WARN('Load Configuration from memory')
             return YamlConfigation._MODEL_CACHE[yaml_path]
 
         with YamlConfigation._lock:                            # 并发加载保护
             if yaml_path not in YamlConfigation._MODEL_CACHE:       # 二次检查
                 YamlConfigation._MODEL_CACHE[yaml_path] = YamlConfigation(yaml_path)
-                __logger.WARN('Load Configuration from local')
+                _logger.WARN('Load Configuration from local')
             return YamlConfigation._MODEL_CACHE[yaml_path]
         
     def __init__(self, yaml_path, **kwargs):            

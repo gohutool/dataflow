@@ -9,7 +9,7 @@ import yaml
 from dataflow.utils.utils import json_to_str, str_to_json
 from dataflow.utils.reflect import is_not_primitive
 
-_logger = Logger('utils.dbtools.redis')
+_logger = Logger('dataflow.utils.dbtools.redis')
 
 
 # REDIS_CONFIG = {

@@ -11,7 +11,7 @@ import atexit
 # Get the default client
 # client = get_client()
 
-_logger = Logger('utils.trace.langfuse')
+_logger = Logger('dataflow.utils.trace.langfuse')
 
 class LangfusePlugin:    
     name:str = 'LangfusePlugin'    

@@ -268,5 +268,5 @@ class Logger:
             
 # ------------------- demo -------------------
 if __name__ == '__main__':
-    _logger = Logger('utils.log')    
+    _logger = Logger('dataflow.utils.log')    
     _logger.DEBUG('====')            

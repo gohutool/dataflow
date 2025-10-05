@@ -8,7 +8,7 @@ from dataflow.utils.log import Logger
 from dataflow.module import Context, WebContext
 # from fastapi.middleware.cors import CORSMiddleware
 
-_logger = Logger('router.endpoint')
+_logger = Logger('dataflow.router.endpoint')
 
 
 # 定义 lifespan 上下文管理器

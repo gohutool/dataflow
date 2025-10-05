@@ -14,7 +14,7 @@ from dataflow.utils.utils import date2str_yyyymmddddmmss
 from datetime import datetime, date
 import fastapi.encoders
 
-_logger = Logger('utils.web.asgi')
+_logger = Logger('dataflow.utils.web.asgi')
 
 # 定义一个自定义装饰器
 def custom_authcheck_decorator(func: Callable):

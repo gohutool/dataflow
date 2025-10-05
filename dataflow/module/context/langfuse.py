@@ -5,7 +5,7 @@ from typing import Callable
 
 prefix = 'context.langfuse'
 
-_logger = Logger('module.context.langfuse')
+_logger = Logger('dataflow.module.context.langfuse')
 
 class LangfuseContext:    
     observe:Callable = LangfusePlugin.observe

@@ -5,7 +5,7 @@ from dataflow.utils.dbtools.milvus import MilvusTools, initMilvusWithConfig
 
 prefix = 'context.milvus'
 
-_logger = Logger('module.context.milvus')
+_logger = Logger('dataflow.module.context.milvus')
 
 
 class MilvusContext:

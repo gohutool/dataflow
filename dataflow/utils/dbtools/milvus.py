@@ -22,7 +22,7 @@ class SearchResult(BaseModel):
     score: float
     fields: Dict[str, Any]
 
-_logger = Logger('utils.dbtools.milvus')
+_logger = Logger('dataflow.utils.dbtools.milvus')
 
 # milvus_client = MilvusClient(uri='http://milvus.ginghan.com:22000',token="root:Milvus",db_name="default")
 class MilvusTools:

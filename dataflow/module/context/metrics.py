@@ -16,7 +16,7 @@ from starlette.responses import Response
 from dataflow.utils.log import Logger
 from dataflow.module import WebContext
 
-_logger = Logger('module.context.metrics')
+_logger = Logger('dataflow.module.context.metrics')
 
 # Request metrics
 http_requests_total = Counter("http_requests_total", "Total number of HTTP requests", ["method", "endpoint", "status"])

@@ -10,7 +10,7 @@ import contextvars
 from typing_extensions import Annotated, Doc
 import inspect
 
-_logger = Logger('module.context')
+_logger = Logger('dataflow.module.context')
 
 _logger.DEBUG('加载module.context')
 
@@ -222,9 +222,13 @@ class Context:
     def Configurationable(*, prefix:str):
         c:YamlConfigation = Context.getContext()._application_config
         config = c.getConfig(prefix)        
-        def decorator(func: Callable) -> Callable:
-            _logger.DEBUG(f'配置组件{get_methodname(func)}进行配置调用{config}')
-            func(config)            
+        def decorator(func: Callable) -> Callable:            
+            if config is not None:            
+                _logger.DEBUG(f'配置组件{get_methodname(func)}进行配置调用{config}')                
+                func(config)
+            else:
+                _logger.WARN(f'{prefix}没有对应值，配置函数只能进行配置相关操作，跳过')
+                            
             @wraps(func)
             def wrapper(*args, **kwargs):                
                 if config is not None:

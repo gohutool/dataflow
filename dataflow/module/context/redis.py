@@ -9,7 +9,7 @@ from fastapi import Request
 
 prefix = 'context.redis'
 
-_logger = Logger('module.context.redis')
+_logger = Logger('dataflow.module.context.redis')
 
 
 class RedisContext:

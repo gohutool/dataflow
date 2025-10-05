@@ -13,7 +13,7 @@ import functools
 from dataflow.utils.utils import date_datetime_cn,date2str_yyyymmddhhmmsss
 import time
 
-_logger = Logger('utils.schedule')
+_logger = Logger('dataflow.utils.schedule')
 
 
 class ScheduleContext:    

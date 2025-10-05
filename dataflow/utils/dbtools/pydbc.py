@@ -13,7 +13,7 @@ import contextvars
 import sys
 import inspect as inspectoin
 
-_logger = Logger('utils.dbtools.pydbc')
+_logger = Logger('dataflow.utils.dbtools.pydbc')
 
 class SimpleExpression:
     class ExpressionException(Exception):

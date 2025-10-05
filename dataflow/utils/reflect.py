@@ -7,7 +7,7 @@ from dataflow.utils.utils import current_millsecond
 import sys 
 import inspect
 
-_logger = Logger('utils.reflect')
+_logger = Logger('dataflow.utils.reflect')
 
 
 def haveAttr(obj:any, attr:str)->bool:
