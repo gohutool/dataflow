@@ -40,11 +40,18 @@ _logger = Logger()
 
 
 class ApplicationBoot:
+    scan:str
+    application_yaml:str
     @staticmethod
     def Start(application_yaml:str='conf/application.yaml', scan:str|list[str]='application.**'):
+        ApplicationBoot.application_yaml = application_yaml
+        ApplicationBoot.scan = scan
+        
         _c = YamlConfigation.loadConfiguration(application_yaml)
         
         host = _c.getStr('server.host', 'localhost')
+        workers = _c.getInt('server.workers', 1)
+        
         port = _c.getInt('server.port', 9000)
 
         log_config = _c.getStr('logging.config', None)
@@ -60,5 +67,5 @@ class ApplicationBoot:
         _logger = Logger()
                 
         _logger.INFO(f"{_c.getStr('application.name', 'DataFlow Application')} {_c.getStr('application.version', '1.0.0')} Start server on {host}:{port}")
-        uvicorn.run("dataflow.router.endpoint:app", host=host, port=port, reload=False, workers=1, headers=[("Server", "my-server/1.0")])
+        uvicorn.run("dataflow.router.endpoint:app", host=host, port=port, reload=False, workers=workers, headers=[("Server", "my-server/1.0")])
         _logger.INFO(f"{_c.getStr('application.name', 'DataFlow Application')} {_c.getStr('application.version', '1.0.0')} End server on {host}:{port}")        

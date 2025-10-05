@@ -8,7 +8,5 @@ if hasattr(time, 'tzset'):          # Unix / macOS / WSL
     time.tzset()
     
     
-    
-    
 if __name__ == "__main__":
     ApplicationBoot.Start()
