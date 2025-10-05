@@ -1,11 +1,2 @@
-## Python enviroment Python 3.12.10 or later
-## validate and check the dependency library
-pip install pipreqs -i https://pypi.mirrors.ustc.edu.cn/simple/
-pipreqs ./ --encoding=utf8 --force
-## install the dependency library
-pip install -r requirements.txt -i https://pypi.mirrors.ustc.edu.cn/simple/
-## run directly
-python main.py
-## package and release the executable program in window system
-pip install pyinstaller -i https://pypi.mirrors.ustc.edu.cn/simple
-pyinstaller --onefile main.py
+Dataflow is an open-source Python microservice framework that simplifies the development of stand-alone, production-grade Spring applications. It provides embedded servers, auto-configuration, and minimal setup, allowing developers to build and run python apps quickly—no heavy XML or boilerplate code needed.
+Python microservice = a tiny, self-contained Java app that starts in seconds, exposes REST endpoints, and ships with its own server—ready to scale and deploy independently.

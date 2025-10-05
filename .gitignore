@@ -1,3 +1,6 @@
 logs
 __pycache__
 /down.txt
+build
+dist
+dataflow.egg-info
