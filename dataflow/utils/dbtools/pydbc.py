@@ -215,6 +215,7 @@ class PydbcTools:
         try:
             
             if not self._sessoin_factory.getSession():
+                _logger.DEBUG('自省事务处理')
                 with self.engine.begin() as connection:
                     results = connection.execute(text(sql), params).fetchall()   # 参数为Dict    
                     rtn = []
@@ -225,16 +226,16 @@ class PydbcTools:
                             rtn.append(None)
                     return rtn
             else:
-                with self._sessoin_factory.getSession() as session:
-                    results = session.execute(text(sql), params).fetchall()   # 参数为Dict    
-                    rtn = []
-                    for one in results:
-                        if one:
-                            rtn.append(one._asdict())                
-                        else:
-                            rtn.append(None)
-                    return rtn
-            
+                session = self._sessoin_factory.getSession() 
+                _logger.DEBUG('事务管理器事务处理')
+                results = session.execute(text(sql), params).fetchall()   # 参数为Dict    
+                rtn = []
+                for one in results:
+                    if one:
+                        rtn.append(one._asdict())                
+                    else:
+                        rtn.append(None)
+                return rtn            
         except Exception as e:
             _logger.ERROR("[Exception]", e)
             raise e
@@ -244,6 +245,7 @@ class PydbcTools:
         _logger.DEBUG(f"[Parameter]:{params}")
         try:
             if not self._sessoin_factory.getSession():
+                _logger.DEBUG('自省事务处理')
                 with self.engine.begin() as connection:
                     results = connection.execute(text(sql), params).fetchone()   # 参数为Dict                    
                     if results:
@@ -251,13 +253,13 @@ class PydbcTools:
                     else:
                         return None
             else:
-                with self._sessoin_factory.getSession() as session:
-                    results = session.execute(text(sql), params).fetchone()   # 参数为Dict                    
-                    if results:
-                        return results._asdict()
-                    else:
-                        return None
-                
+                session = self._sessoin_factory.getSession()
+                _logger.DEBUG('事务管理器事务处理')
+                results = session.execute(text(sql), params).fetchone()   # 参数为Dict                    
+                if results:
+                    return results._asdict()
+                else:
+                    return None                
         except Exception as e:
             _logger.ERROR("[Exception]", e)
             raise e
@@ -307,6 +309,7 @@ class PydbcTools:
         
         if not self._sessoin_factory.getSession():
             with self.engine.begin() as connection:
+                _logger.DEBUG('自省事务处理')
                 try:
                     results = connection.execute(text(sql), params)
                     
@@ -317,13 +320,14 @@ class PydbcTools:
                     _logger.ERROR("[Exception]", e)
                     raise e
         else:                
-            with self._sessoin_factory.getSession() as connection:
-                try:
-                    results = connection.execute(text(sql), params)                
-                    return results.rowcount
-                except Exception as e:
-                    _logger.ERROR("[Exception]", e)
-                    raise e
+            connection = self._sessoin_factory.getSession()
+            _logger.DEBUG('事务管理器事务处理')
+            try:
+                results = connection.execute(text(sql), params)                
+                return results.rowcount
+            except Exception as e:
+                _logger.ERROR("[Exception]", e)
+                raise e
             
     def insert(self, sql, params=None):
         return self.update(sql, params)
@@ -373,6 +377,7 @@ class PydbcTools:
         
         if not self._sessoin_factory.getSession():
             with self.engine.begin() as connection:
+                _logger.DEBUG('自省事务处理')
                 try:
                     results = connection.execute(text(sql), valided_data)                    
                     # 获取自增长ID
@@ -389,19 +394,20 @@ class PydbcTools:
                     _logger.ERROR("[Exception]", e)
                     raise e
         else:
-            with self._sessoin_factory.getSession() as connection:
-                try:
-                    results = connection.execute(text(sql), valided_data)                    
-                    # 获取自增长ID
-                    inserted_id = None
-                    if auto_increment_column:
-                        inserted_id = self._get_last_insert_id(connection, tablename, auto_increment_column)
-                        params[auto_increment_column] = inserted_id
-                                        
-                    return results.rowcount
-                except Exception as e:
-                    _logger.ERROR("[Exception]", e)
-                    raise e
+            connection = self._sessoin_factory.getSession()
+            _logger.DEBUG('事务管理器事务处理')
+            try:
+                results = connection.execute(text(sql), valided_data)                    
+                # 获取自增长ID
+                inserted_id = None
+                if auto_increment_column:
+                    inserted_id = self._get_last_insert_id(connection, tablename, auto_increment_column)
+                    params[auto_increment_column] = inserted_id
+                                    
+                return results.rowcount
+            except Exception as e:
+                _logger.ERROR("[Exception]", e)
+                raise e
         
     def updateT2(self, tablename:str, obj:dict=None, where:dict=None, condiftion:str=None):
         if not obj:
@@ -741,6 +747,7 @@ class PydbcTools:
         
         if not self._sessoin_factory.getSession():
             with self.engine.begin() as connection:
+                _logger.DEBUG('自省事务处理')
                 try:
                     datas = []
                     for params in paramsList:                                            
@@ -768,27 +775,28 @@ class PydbcTools:
                     _logger.ERROR("[Exception]", e)
                     raise e
         else:    
-            with self._sessoin_factory.getSession() as connection:
-                try:
-                    datas = []
-                    for params in paramsList:                                            
-                        datas.append(params)
-                        if len(datas) >= batchsize:
-                            count = connection.connection().connection.cursor().executemany(sql, datas)  # 参数为元组    
-                            results += count
-                            _logger.DEBUG(f'批处理执行{len(datas)}条记录，更新数据{count}')                        
-                            # self.commit(connection)                            
-                            datas.clear()
-                    if len(datas) > 0:
+            connection = self._sessoin_factory.getSession()
+            _logger.DEBUG('事务管理器事务处理')
+            try:
+                datas = []
+                for params in paramsList:                                            
+                    datas.append(params)
+                    if len(datas) >= batchsize:
                         count = connection.connection().connection.cursor().executemany(sql, datas)  # 参数为元组    
                         results += count
-                        _logger.DEBUG(f'批处理执行{len(datas)}条记录，更新数据{count}')                                            
-                        # self.commit(connection)                    
-                    return results
-                except Exception as e:
-                    # self.rollback(connection)
-                    _logger.ERROR("[Exception]", e)
-                    raise e
+                        _logger.DEBUG(f'批处理执行{len(datas)}条记录，更新数据{count}')                        
+                        # self.commit(connection)                            
+                        datas.clear()
+                if len(datas) > 0:
+                    count = connection.connection().connection.cursor().executemany(sql, datas)  # 参数为元组    
+                    results += count
+                    _logger.DEBUG(f'批处理执行{len(datas)}条记录，更新数据{count}')                                            
+                    # self.commit(connection)                    
+                return results
+            except Exception as e:
+                # self.rollback(connection)
+                _logger.ERROR("[Exception]", e)
+                raise e
 
 
 class Propagation(Enum):
@@ -819,6 +827,7 @@ class SessionFactory:
         _logger.DEBUG(f'获取Session={_session}')
         return _session            
     def beginSession(self, session):        
+        _logger.DEBUG(f'新事物开始{session}')
         _l:list = self._session_stack.get()
         _l.append(session)        
     def endSession(self):
@@ -831,7 +840,7 @@ class SessionFactory:
 
 class TX:
     def __init__(self, pydbc: PydbcTools,*,propagation:Propagation=Propagation.REQUIRED,rollback_for:Union[Type[Exception], Tuple[Type[Exception], ...]] = Exception):
-        self._session_factory = SessionFactory(pydbc)
+        self._session_factory = pydbc._sessoin_factory
         self._propagation = propagation
         self._rollback_for = rollback_for if isinstance(rollback_for, tuple) else (rollback_for,)
     
@@ -1035,6 +1044,8 @@ if __name__ == "__main__":
     rtn = p.insertT('dataflow_test.sa_security_realtime_daily', sample)
     print(f'Result={rtn}   {sample}')
     
+    sample2 = sample
+    
     sample = '''
     {"price":"4.25","changepct":"-0.47","change":"-0.02","volume":"56537","turnover":"24137761.32","amp":"1.17"}
     '''
@@ -1082,14 +1093,40 @@ if __name__ == "__main__":
     print(get_unique_seq())
     print(get_unique_seq())
     
-    @TX(p)
-    def test_tx():
-        _logger.DEBUG("test_tx ========================")
+    
+    @TX(p, propagation=Propagation.REQUIRES_NEW)
+    def test_tx_3():
+        _logger.DEBUG("test_tx3 ========================")
+        # rtn = p.queryMany('select * from dataflow_test.sa_security_realtime_daily where 1=1 AND ' + exp.Sql(), exp.Param())
+        # print(f'Result={rtn}')
+        
+        sample2['code']=f'3_{current_millsecond()}'
+        rtn = p.insertT('dataflow_test.sa_security_realtime_daily', sample2)
+        print(f'Result={rtn}   {sample2}')
+    
+        input('输入任何字符退出test_tx3')
+        print('退出test_tx3')
         pass
     
-    test_tx()
+    @TX(p)
+    def test_tx_2():
+        _logger.DEBUG("test_tx2 ========================")
+        # rtn = p.queryMany('select * from dataflow_test.sa_security_realtime_daily where 1=1 AND ' + exp.Sql(), exp.Param())
+        # print(f'Result={rtn}')
+        
+        sample2['code']=f'2_{current_millsecond()}'
+        rtn = p.insertT('dataflow_test.sa_security_realtime_daily', sample2)
+        print(f'Result={rtn}   {sample2}')
+                
+        test_tx_3()
     
+        input('输入任何字符退出test_tx2')
+        print('退出test_tx2')
+        pass
+    
+    test_tx_2()
     sys.exit()
+    
     
     
     url = 'postgresql+psycopg2://u:p@pgvector.ginghan.com:29432/aiproxy'
