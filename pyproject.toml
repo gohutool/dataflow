@@ -1,0 +1,36 @@
+[project]
+name = "gohutool-dataflow"
+version = "1.0.1"                    # 版本顺手+1，避免“文件已存在”
+readme = "README.md"
+license = "Apache-2.0"
+authors = [
+    {name = "joinsunsoft", email = "inthirties.liu@hotmail.com"},
+]
+maintainers = [{name = "joinsunsoft", email = "inthirties.liu@hotmail.com"}]
+requires-python = ">=3.12.10"
+description="Dataflow is an open-source Python microservice framework that simplifies the development of stand-alone production-grade Spring applications."
+license-files = ["LICENSE"]
+dependencies = [
+    "fastapi>=0.117.1",
+]
+
+[project.urls]                         # 以前叫 url/homepage
+Homepage = "https://github.com/gohutool/dataflow"
+Repository = "https://github.com/gohutool/dataflow"
+Issues = "https://github.com/gohutool/dataflow"
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "ruff", "mypy"]
+
+# [tool.setuptools]
+# py-modules = []          # 清空模块列表
+# packages = ["dataflow"]  # 只打包这个包
+# packages = [
+#     "dataflow",
+#     "dataflow.module",
+#     "dataflow.module.context",
+# ]
+
+[tool.setuptools.packages.find]
+where = ["."]                 # 或 ["src"] 如果你用 src-layout
+include = ["dataflow*"]       # 把 dataflow 及其所有子包都收进来
