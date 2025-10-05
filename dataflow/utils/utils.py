@@ -15,6 +15,8 @@ from pydantic import BaseModel, ConfigDict
 import decimal
 import threading
 from itertools import count
+import uuid
+from uuid import UUID as UUIDOBJ
 
 # from pydantic import BaseModel, Field
 
@@ -56,6 +58,7 @@ def date_which_week_day_info(target_date:str|date|datetime=None):
 def find_index(datas:list[dict], key:str='id', value:any=None)->int:
     # 使用 enumerate 和列表推导式找到索引
     index = next((i for i, data in enumerate(datas) if data[key] == value), None)
+
     return index
 
 
@@ -555,6 +558,12 @@ def r_bytes(d:bytes, width:int, fillchar=b'\0', trim:bool=False):
     return d
 
 
+def UUID():
+    return uuid.uuid4()
+
+def SNAKE_UUID(worker:str):
+    return uuid.uuid5(UUIDOBJ('6ba7b814-9dad-11d1-80b4-00c04fd430c8'), worker)
+
 # def copy2Dict(
 #                 obj: Any, 
 #                 include_private: bool = False,
@@ -712,8 +721,6 @@ class ReponseVO:
         self.data = data
         self.code = code
         
-        
-    
     # ① 供 Pydantic 序列化
     def dict(self) -> dict:
         return {

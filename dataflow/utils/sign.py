@@ -1,5 +1,4 @@
 from dataflow.utils.utils import r_bytes, str_isEmpty
-import os
 import base64 
 import urllib
 import hashlib
@@ -7,9 +6,12 @@ from Crypto.Cipher import AES
 from Crypto.Cipher import DES3
 from Crypto.Util.Padding import pad, unpad
 
-def b64_encode(s: str) -> str:
-    return base64.b64encode(s.encode()).decode()
-
+def b64_encode(s: str|bytes) -> str:
+    if isinstance(s, str):
+        return base64.b64encode(s.encode()).decode()
+    else:
+        return base64.b64encode(s).decode()
+    
 def b64_decode(s: str) -> str:
     return base64.b64decode(s).decode()
 

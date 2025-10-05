@@ -36,6 +36,4 @@ def read_item(item_id: str):
         data=usr
     )
     
-    
-
 WebContext.getRoot().include_router(router)

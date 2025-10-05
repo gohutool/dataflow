@@ -228,7 +228,7 @@ def init_web_common_filter(app:FastAPI):
         _logger.INFO(f"[{rid}] {request.method} {request.url}")        
         return response    
     _logger.DEBUG(f'添加过滤器装饰器={wrap_exception_handler}') 
-    
+        
     @app.middleware("http")
     async def xid_handler(request: Request, call_next):
         # ====== 请求阶段 ======
@@ -247,7 +247,17 @@ def init_web_common_filter(app:FastAPI):
         # ====== 响应阶段 ======
         cost = (current_millsecond() - start)
         response.headers["X-Request-ID"] = rid      
-        response.headers["X-Cost-ms"] = str(cost)                      
+        response.headers["X-Cost-ms"] = str(cost)
+        
+        # txt = body.decode("utf-8", errors="replace")
+        path_params = request.path_params
+        # 2. 查询参数
+        query_params = dict(request.query_params)
+        # 3. 请求头
+        headers = dict(request.headers)
+        # 4. Cookie
+        cookies = dict(request.cookies)
+        _logger.DEBUG(f'path_params={path_params} query_params={query_params} headers={headers} cookies={cookies}')
         
         _logger.INFO(f"[{request.url}][{ip}] {response.status_code} {cost:.2f}ms")
         return response        
