@@ -23,6 +23,12 @@ _web_onloaded = []
 _web_onstarted = []
 _web_on_poststarted = []
 
+def Bean(service_name:str):
+    return Context.getContext().getBean(service_name)
+
+def Value(palceholder:str):
+    return Context.Value(palceholder)
+
 class Context:
     class ContextExceptoin(HTTPException):
         def __init__(

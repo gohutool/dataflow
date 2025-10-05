@@ -851,18 +851,20 @@ class TX:
     def _handle_when_expcetion(self, func:Callable, need_end, *args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except Exception as e:
-            session = self._session_factory.getSession()                
-            if session and session.in_transaction():
-                if self._should_rollback(type(e)):
-                    session.rollback()
-                else:
-                    # 对于不需要回滚的异常，尝试提交
-                    try:
-                        session.commit()
-                    except Exception:
-                        # 如果提交失败，则回滚
+        except Exception as e:      
+            if self._rollback_for:
+                session = self._session_factory.getSession()
+                if session and session.in_transaction():
+                    if self._should_rollback(type(e)):
+                        _logger.DEBUG()
                         session.rollback()
+                    else:
+                        # 对于不需要回滚的异常，尝试提交
+                        try:
+                            session.commit()
+                        except Exception:
+                            # 如果提交失败，则回滚
+                            session.rollback()
             raise
         finally:
             if need_end:
@@ -988,7 +990,7 @@ class TX:
     
     def _should_rollback(self, exc_type: Type[Exception]) -> bool:
         """判断是否应该回滚"""
-        # 最后检查 rollback_for
+        # 最后检查 rollback_for        
         return any(issubclass(exc_type, rollback_exc) for rollback_exc in self._rollback_for)
 
 

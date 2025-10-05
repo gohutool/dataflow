@@ -1,7 +1,9 @@
-from dataflow.module import Context
-from dataflow.utils.dbtools.pydbc import PydbcTools
+from dataflow.module import Context, Bean
+from dataflow.utils.dbtools.pydbc import PydbcTools,Propagation, TX as _tx
+
 from dataflow.utils.utils import str_isEmpty
 from dataflow.utils.log import Logger
+from typing import Union,Type,Tuple
 
 prefix = 'context.database'
 
@@ -14,6 +16,15 @@ class DataSourceContext:
             ds_name = 'ds'            
         return Context.getContext().getBean(f'{ds_name}')
     
+def TX(pydbc:str|PydbcTools, *, propagation:Propagation=Propagation.REQUIRED,rollback_for:Union[Type[Exception], Tuple[Type[Exception], ...]] = Exception):
+    if isinstance(pydbc, str):
+        pydbc = Bean(pydbc)
+    elif isinstance(pydbc, PydbcTools):
+        pydbc = pydbc
+    else:
+        raise Context.ContextExceptoin('只能使用str或者Pydbc实例作为参数')
+    
+    return _tx(pydbc, propagation, rollback_for)
 
 @Context.Configurationable(prefix=prefix)
 def _init_datasource_context(config):
