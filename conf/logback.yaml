@@ -1,5 +1,5 @@
 version: 1
-disable_existing_loggers: False
+disable_existing_loggers: true
 formatters:
   simple:
     format: '%(levelname)s:[%(_filename)s:%(_lineno)d][%(name)s] - %(asctime_cn)s - %(message)s'
@@ -43,6 +43,10 @@ loggers:
     handlers: [console, file]
     propagate: False
   utils.web.asgi:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: False
+  utils.schedule:
     level: DEBUG
     handlers: [console, file]
     propagate: False
