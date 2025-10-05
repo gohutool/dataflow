@@ -126,7 +126,7 @@ class Context:
                 _m += _modules
         
         _logger.DEBUG(f'加载模块路径{scan_path}结束')        
-        Context.Event.emit('loaded', _contextContainer._context, _modules)
+        Context.Event.emit('loaded', _contextContainer._context, _m)
         
     def __init__(self, applicationConfig_file:str, scan_path:str):
         self._CONTEXT = {}     

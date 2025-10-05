@@ -1,17 +1,21 @@
 [project]
 name = "gohutool-dataflow"
-version = "1.0.1"                    # 版本顺手+1，避免“文件已存在”
+version = "1.0.2"                    # 版本顺手+1，避免“文件已存在”
 readme = "README.md"
 license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [
-    {name = "joinsunsoft", email = "inthirties.liu@hotmail.com"},
+    {name = "joinsunsoft", email = "793875613@qq.com"},
 ]
 maintainers = [{name = "joinsunsoft", email = "inthirties.liu@hotmail.com"}]
 requires-python = ">=3.12.10"
 description="Dataflow is an open-source Python microservice framework that simplifies the development of stand-alone production-grade Spring applications."
-license-files = ["LICENSE"]
 dependencies = [
     "fastapi>=0.117.1",
+    "sqlalchemy>=2.0.43",
+    "omegaconf>=2.3.0",
+    "pydantic>=2.11.9",
+    "uvicorn>=0.37.0",
 ]
 
 [project.urls]                         # 以前叫 url/homepage
@@ -20,9 +24,12 @@ Repository = "https://github.com/gohutool/dataflow"
 Issues = "https://github.com/gohutool/dataflow"
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "ruff", "mypy"]
+dev = ["pytest"]
 
-# [tool.setuptools]
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
 # py-modules = []          # 清空模块列表
 # packages = ["dataflow"]  # 只打包这个包
 # packages = [
