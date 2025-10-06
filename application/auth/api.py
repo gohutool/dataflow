@@ -2,11 +2,10 @@ from fastapi import APIRouter
 from dataflow.module import WebContext
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import UUID
-from fastapi.responses import StreamingResponse
 from captcha.image import ImageCaptcha
 import random
 import string
-import io
+
 from dataflow.utils.sign import b64_encode
 from application import AppReponseVO
 

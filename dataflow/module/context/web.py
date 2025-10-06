@@ -179,33 +179,8 @@ def init_error_handler(app:FastAPI):
             # content={"code": 422, "message": "参数校验失败", "errors": exc.errors()}
             content=ReponseVO(False, code=422, msg=exc.detail, data=exc.errors)
         )
-
-@Context.Configurationable(prefix='context.web.cors')
-def _config_cors_filter(config):
-    _logger.DEBUG(f'CORS过滤器装饰器信息=[{config}]')
-    
-    @WebContext.Event.on_loaded
-    def _init_cros_filter(app:FastAPI):        
-        # origins = ["*"]        
-        opts = {
-            'allow_origins':get_list_from_dict(config, 'allow_origins', ["*"]),
-            'allow_methods':get_list_from_dict(config, 'allow_methods', ["*"]),
-            'allow_headers':get_list_from_dict(config, 'allow_headers', ["*"]),
-            'allow_credentials':get_bool_from_dict(config, 'allow_credentials', True),
-        }
-        app.add_middleware(
-            CORSMiddleware,
-            **opts
-            # # allow_origins=origins,
-            # allow_origins=["*"],
-            # allow_credentials=True,
-            # allow_methods=["*"],
-            # allow_headers=["*"],
-        )
-        _logger.DEBUG(f'添加CORS过滤器装饰器[{opts}]={CORSMiddleware}成功')
         
-        
-@WebContext.Event.on_loaded
+@WebContext.Event.on_started
 def init_web_common_filter(app:FastAPI):    
     @app.middleware("http")
     async def wrap_exception_handler(request: Request, call_next):
@@ -263,6 +238,32 @@ def init_web_common_filter(app:FastAPI):
         return response        
     _logger.DEBUG(f'添加过滤器装饰器={xid_handler}')  
 
+
+@Context.Configurationable(prefix='context.web.cors')
+def _config_cors_filter(config):
+    _logger.DEBUG(f'CORS过滤器装饰器信息=[{config}]')
+    
+    @WebContext.Event.on_started
+    def _init_cros_filter(app:FastAPI):        
+        # origins = ["*"]        
+        opts = {
+            'allow_origins':get_list_from_dict(config, 'allow_origins', ["*"]),
+            'allow_methods':get_list_from_dict(config, 'allow_methods', ["*"]),
+            'allow_headers':get_list_from_dict(config, 'allow_headers', ["*"]),
+            'allow_credentials':get_bool_from_dict(config, 'allow_credentials', True),
+        }
+        app.add_middleware(
+            CORSMiddleware,
+            **opts
+            # # allow_origins=origins,
+            # allow_origins=["*"],
+            # allow_credentials=True,
+            # allow_methods=["*"],
+            # allow_headers=["*"],
+        )
+        _logger.DEBUG(f'添加CORS过滤器装饰器[{opts}]={CORSMiddleware}成功')
+        
+        
 if __name__ == "__main__":    
     matcher = AntPathMatcher()
     def test_match(str1,str2):

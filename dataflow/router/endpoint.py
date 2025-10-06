@@ -32,8 +32,8 @@ app = FastAPI(lifespan=lifespan,
               version="1.0.0")       
     
 @Context.Context(app=app, application_yaml=ApplicationBoot.application_yaml, scan=ApplicationBoot.scan)
-def initApp(app:FastAPI,context1:Context):
-    _logger.INFO(f'开始初始化App={app} {context1}')
+def initApp(app:FastAPI,context:Context):
+    _logger.INFO(f'开始初始化App={app} {context}')
     
 # initApp(app=app)
 
