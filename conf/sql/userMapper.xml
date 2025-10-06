@@ -1,0 +1,2 @@
+<mapper namespace='application.user.mapper.UserMapper'>
+</mapper>
