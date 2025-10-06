@@ -2,12 +2,14 @@
 from typing import Callable
 from starlette.middleware.base import BaseHTTPMiddleware
 from dataflow.utils.log import Logger
-from dataflow.utils.utils import str_isEmpty,str_strip, ReponseVO, get_list_from_dict, get_bool_from_dict,current_millsecond  # noqa: F401
+from dataflow.utils.utils import str_isEmpty,str_strip, ReponseVO, get_list_from_dict, get_bool_from_dict,current_millsecond
 from dataflow.utils.web.asgi import get_remote_address, CustomJSONResponse,get_ipaddr
+from dataflow.utils.reflect import get_methodname
 from dataflow.module import Context, WebContext
 from antpathmatcher import AntPathMatcher
 from fastapi import Request, FastAPI
 from slowapi import Limiter
+import functools
 # from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError,HTTPException
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -28,11 +30,7 @@ antmatcher = AntPathMatcher()
 # print(variables) # 输出: {'user_id': '123', 'post_id': '456'}
 _filter = []
 
-def filter(app:FastAPI=None, *, path:list[str]|str='*', excludes:list[str]|str=None, order=1):    
-    
-    if not app:
-        app = WebContext.getRoot()
-    
+def filter(app:FastAPI=None, *, path:list[str]|str='*', excludes:list[str]|str=None, order=1):       
     paths = None
     if isinstance(path, list):
         paths = []
@@ -57,41 +55,46 @@ def filter(app:FastAPI=None, *, path:list[str]|str='*', excludes:list[str]|str=N
             _excludes = str_strip(excludes).split(',')
         
     def decorator(func: Callable) -> Callable:
-        if (paths is None or len(paths) == 0) and (_excludes is None or len(_excludes) == 0):
-            app.add_middleware(BaseHTTPMiddleware, dispatch=func)
-        else:
-            async def new_func(request: Request, call_next):   
-                if _excludes is not None and len(_excludes)>0 :
-                    for o in _excludes:
-                        if antmatcher.match(o, request.url.path):                        
-                            return await call_next(request)                                                
+        _filter.append((order, app, path, excludes, func, paths, _excludes))
+        @functools.wraps(func)
+        async def wrapper(request: Request, call_next):
+             return await call_next(request) 
+        return wrapper 
+        # if (paths is None or len(paths) == 0) and (_excludes is None or len(_excludes) == 0):
+        #     app.add_middleware(BaseHTTPMiddleware, dispatch=func)
+        # else:
+        #     async def new_func(request: Request, call_next):   
+        #         if _excludes is not None and len(_excludes)>0 :
+        #             for o in _excludes:
+        #                 if antmatcher.match(o, request.url.path):                        
+        #                     return await call_next(request)                                                
                 
-                matched = False
-                if paths is not None and len(paths)>0:
-                    for o in paths:
-                        if antmatcher.match(o, request.url.path):
-                            matched = True
-                            break
-                else:
-                    matched = True
+        #         matched = False
+        #         if paths is not None and len(paths)>0:
+        #             for o in paths:
+        #                 if antmatcher.match(o, request.url.path):
+        #                     matched = True
+        #                     break
+        #         else:
+        #             matched = True
                         
-                if not matched:
-                    return await call_next(request)
-                else:
-                    _logger.DEBUG(f'{request.url.path}被拦截器拦截')
-                    try:
-                        return await func(request, call_next)                                
-                    except HTTPException as e:
-                        raise e
-                    except RequestValidationError as e:
-                        raise e
-                    except StarletteHTTPException as e:
-                        raise e
-                    except Exception as e:
-                        raise Context.ContextExceptoin(detail=e.__str__())
+        #         if not matched:
+        #             return await call_next(request)
+        #         else:
+        #             _logger.DEBUG(f'{request.url.path}被拦截器拦截')
+        #             try:
+        #                 return await func(request, call_next)                                
+        #             except HTTPException as e:
+        #                 raise e
+        #             except RequestValidationError as e:
+        #                 raise e
+        #             except StarletteHTTPException as e:
+        #                 raise e
+        #             except Exception as e:
+        #                 raise Context.ContextExceptoin(detail=e.__str__())
                     
-            app.add_middleware(BaseHTTPMiddleware, dispatch=new_func)      
-    _logger.DEBUG(f'创建过滤器装饰器={decorator} path={path} excludes={excludes}')
+        #     app.add_middleware(BaseHTTPMiddleware, dispatch=new_func)      
+    # _logger.DEBUG(f'创建过滤器装饰器={decorator} path={path} excludes={excludes}')
     return decorator
 
 def _global_id(request:Request):
@@ -179,6 +182,57 @@ def init_error_handler(app:FastAPI):
             # content={"code": 422, "message": "参数校验失败", "errors": exc.errors()}
             content=ReponseVO(False, code=422, msg=exc.detail, data=exc.errors)
         )
+
+@WebContext.Event.on_started
+def _register_all_filter(_app:FastAPI):
+    _logger.DEBUG(f'自定义{len(_filter)}个过滤器进行初始化')
+    # 排序：先按 order 升序，再按插入序号降序（后插入在前）
+    # _filter.sort(key=lambda t: (t[1], -t[2]))
+    # 排序：先按 order 升序，再按插入序号升序（先插入在前）
+    # _filter.append((order, app, path, excludes, func, paths, _excludes))
+    _filter.sort(key=lambda t: (t[0], t[2]), reverse=False)
+    for v in _filter:
+        _o,app,_path,_ex,func,paths,_excludes=v         
+        app:FastAPI = app
+        if not app:
+            app = _app        
+        if (paths is None or len(paths) == 0) and (_excludes is None or len(_excludes) == 0):
+            app.add_middleware(BaseHTTPMiddleware, dispatch=func)
+        else:
+            async def new_func(request: Request, call_next):   
+                if _excludes is not None and len(_excludes)>0 :
+                    for o in _excludes:
+                        if antmatcher.match(o, request.url.path):                        
+                            return await call_next(request)                                                
+                
+                matched = False
+                if paths is not None and len(paths)>0:
+                    for o in paths:
+                        if antmatcher.match(o, request.url.path):
+                            matched = True
+                            break
+                else:
+                    matched = True
+                        
+                if not matched:
+                    return await call_next(request)
+                else:
+                    _logger.DEBUG(f'{request.url.path}被拦截器拦截')
+                    try:
+                        return await func(request, call_next)                                
+                    except HTTPException as e:
+                        raise e
+                    except RequestValidationError as e:
+                        raise e
+                    except StarletteHTTPException as e:
+                        raise e
+                    except Exception as e:
+                        raise Context.ContextExceptoin(detail=e.__str__())
+                    
+            app.add_middleware(BaseHTTPMiddleware, dispatch=new_func)   
+            
+        _logger.DEBUG(f'注册过滤器={get_methodname(func)}[{_o}] path={_path} excludes={_ex}')
+    
         
 @WebContext.Event.on_started
 def init_web_common_filter(app:FastAPI):    
@@ -202,7 +256,7 @@ def init_web_common_filter(app:FastAPI):
         
         _logger.INFO(f"[{rid}] {request.method} {request.url}")        
         return response    
-    _logger.DEBUG(f'添加过滤器装饰器={wrap_exception_handler}') 
+    _logger.DEBUG(f'注册过滤器={wrap_exception_handler}') 
         
     @app.middleware("http")
     async def xid_handler(request: Request, call_next):
@@ -215,6 +269,27 @@ def init_web_common_filter(app:FastAPI):
         
         _logger.INFO(f"[{rid}] {request.method} {request.url}")
         
+        # txt = body.decode("utf-8", errors="replace")
+        path_params = request.path_params
+        # 2. 查询参数
+        query_params = dict(request.query_params)
+        # 3. 请求头
+        headers = dict(request.headers)
+        # 4. Cookie
+        cookies = dict(request.cookies)
+        
+        body = await request.body()
+        # 构造新作用域 request，后续路由再读 body() 时实际读的是缓存
+        async def receive():
+            return {"type": "http.request", "body": body, "more_body": False}
+        request = Request(request.scope, receive=receive)
+        
+        _logger.DEBUG(f'Path_params={path_params}')        
+        _logger.DEBUG(f'Query_params={query_params}')
+        _logger.DEBUG(f'Headers={headers}')
+        _logger.DEBUG(f'Cookies={cookies}')
+        _logger.DEBUG(f'Body={body.decode("utf-8", errors="replace")}')
+        
         WebContext.setRequest(request)        
         response = await call_next(request)
         WebContext.resetRequest()
@@ -224,19 +299,10 @@ def init_web_common_filter(app:FastAPI):
         response.headers["X-Request-ID"] = rid      
         response.headers["X-Cost-ms"] = str(cost)
         
-        # txt = body.decode("utf-8", errors="replace")
-        path_params = request.path_params
-        # 2. 查询参数
-        query_params = dict(request.query_params)
-        # 3. 请求头
-        headers = dict(request.headers)
-        # 4. Cookie
-        cookies = dict(request.cookies)
-        _logger.DEBUG(f'path_params={path_params} query_params={query_params} headers={headers} cookies={cookies}')
         
         _logger.INFO(f"[{request.url}][{ip}] {response.status_code} {cost:.2f}ms")
         return response        
-    _logger.DEBUG(f'添加过滤器装饰器={xid_handler}')  
+    _logger.DEBUG(f'注册过滤器={xid_handler}')  
 
 
 @Context.Configurationable(prefix='context.web.cors')
@@ -261,7 +327,7 @@ def _config_cors_filter(config):
             # allow_methods=["*"],
             # allow_headers=["*"],
         )
-        _logger.DEBUG(f'添加CORS过滤器装饰器[{opts}]={CORSMiddleware}成功')
+        _logger.DEBUG(f'添加CORS过滤器[{opts}]={CORSMiddleware}成功')
         
         
 if __name__ == "__main__":    
