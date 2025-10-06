@@ -246,7 +246,7 @@ class Context:
     
     # ---------------- 核心：@service 装饰器 -----------------
     @staticmethod        
-    def service(name: str = None):
+    def Service(name: str = None):
         """
         类装饰器
         :param name: 指定注册名，None 则按类本身注册

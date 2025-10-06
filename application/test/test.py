@@ -12,7 +12,7 @@ from dataflow.utils.schedule import ScheduleContext
 _logger = Logger('application.test')
 app:FastAPI = WebContext.getRoot()
 
-@Context.service('userService')
+@Context.Service('userService')
 class UerService:
     pydbc:PydbcTools=Context.Autowired(name='ds01')
     def getItemInfo(self, item_id:str)->any:
@@ -30,11 +30,11 @@ class ItemService:
 
 itemService = ItemService('NoName')
 
-@Context.service('itemService2')
+@Context.Service('itemService2')
 def getItemService2():
     return ItemService('2')
 
-@Context.service('itemService1')
+@Context.Service('itemService1')
 def getItemService1():
     return ItemService('1')
 
