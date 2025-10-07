@@ -34,6 +34,6 @@
     </update>
     
     <insert id='addUser'>
-        insert into 
+        insert into t_user(name, age, type) values(:name, :age, :type)
     </insert>
 </mapper>

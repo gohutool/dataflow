@@ -1,12 +1,23 @@
 from dataflow.utils.antpath import find
-from dataflow.utils.reflect import getType, get_fullname, getInstance, getPydanticInstance
-from dataflow.utils.reflect import inspect_own_method, inspect_class_method, inspect_static_method
+from dataflow.utils.reflect import getType, get_fullname, getInstance
+# from dataflow.utils.reflect import inspect_own_method, inspect_class_method, inspect_static_method, getPydanticInstance
 from jinja2 import Template
 import re
 import xml.etree.ElementTree as ET
 from typing import Self
 from dataflow.utils.utils import str_isEmpty
 from datetime import datetime, date
+
+# from jinja2 import Environment
+
+# env = Environment(
+#     loader=...,
+#     trim_blocks=True,      # 去掉块级标签后的第一个空行
+#     lstrip_blocks=True,    # 去掉块级标签前的空白
+# )
+
+
+
 _p = r'\{\$\s*.*?\s*\$\}'
 _ip = r'^\{\$\s*|\s*\$\}$'
 
@@ -19,6 +30,7 @@ class SQLItem:
         self.resultType = None if str_isEmpty(resultType) else resultType.strip()
         self.references = references
         self.options = options
+        self.sqlTemplate:Template = None
     
     def __repr__(self):
         # return f'type={self.type} txt={self.txt} sql={self.sql} resultType={self.getReulstType()}[{self.resultType}] references={self.references} options={self.options}'
@@ -26,6 +38,9 @@ class SQLItem:
     
     def hasReference(self):
         return self.references
+    
+    def build_sql(self, data:any)->str:
+        return self.sqlTemplate.render(data)
     
     def getReulstType(self):
         if str_isEmpty(self.resultType):
@@ -63,10 +78,24 @@ class XMLConfig:
         return f'namespace={self.namespace} sqls={'\n'.join(f'{k}: {v}' for k, v in self.sqls.items())} ready={self.ready}'
     
     def getSql(self, id:str)->str:
+        if id not in self.sqls:
+            raise KeyError(f'缺少 key：{id}')
+        
         return self.sqls.get(id)
     
     @staticmethod
-    def rebulid_references(refs:dict[str, SQLItem])->dict[str, SQLItem]:        
+    def sqlItem(namespace:str, id:str)->SQLItem:
+        if namespace not in XMLConfig._ALL_CONFIG:
+            raise KeyError(f'缺少 namespace：{namespace}')
+        xmlConfig:XMLConfig = XMLConfig._ALL_CONFIG[namespace]
+        return xmlConfig.getSql(id)
+    
+    @staticmethod    
+    def build_sql(namespace:str, id:str, data:any):
+        return XMLConfig.sqlItem(namespace, id).build_sql(data)
+            
+    @staticmethod
+    def placeholder_references(refs:dict[str, SQLItem])->dict[str, SQLItem]:        
         """原地解析嵌套占位符，返回新字典；循环依赖抛 ValueError。"""
         resolved: dict[str, SQLItem] = {}          # 已解析的最终值
         visiting: set[str] = set()             # 当前解析链（用于判环）
@@ -89,7 +118,7 @@ class XMLConfig:
                     replace_k = o[0]
                     replace_id = o[1]
                     _sql = _sql.replace(replace_k, dfs(replace_id).sql)
-                raw.sql = _sql            
+                raw.sql = _sql                            
             else:
                 raw.sql = raw.txt
             
@@ -103,7 +132,7 @@ class XMLConfig:
         return resolved
     
     def binding_references(self):        
-        self.references = XMLConfig.rebulid_references(self.references)
+        self.references = XMLConfig.placeholder_references(self.references)
         # print(self.references)
         for k, v in self.sqls.items():
             v:SQLItem = v
@@ -123,6 +152,8 @@ class XMLConfig:
                     v.sql = _sql
                 else:
                     v.sql = v.txt
+                
+                v.sqlTemplate = Template(v.sql, trim_blocks=True, lstrip_blocks=True)
         self.ready = True
             
     @staticmethod
@@ -152,7 +183,7 @@ def _parse_xml(file:str)->XMLConfig:
     # sqlnodes = root.iter('sql')
     sqls = {}
     for sqlnode in root:
-        txt = sqlnode.text
+        txt = sqlnode.text.strip()
         id = sqlnode.attrib['id']        
         _list = get_ref_name(txt)
         references = []
@@ -223,6 +254,11 @@ if __name__ == "__main__":
     xc = XMLConfig.parseXML('conf/sql/userMapper.xml')
     print(xc)
     
+    sqlItem:SQLItem = XMLConfig.sqlItem('application.user.mapper.UserMapper', 'select_by_id')
+    print(sqlItem.sql)
+    
+    sql = XMLConfig.build_sql('application.user.mapper.UserMapper', 'select_by_id', data)
+    print(f'SQL={sql}')
     # xc = _parse_xml('conf/sql/userMapper.xml')
     # print(xc)
     
