@@ -1,2 +1,31 @@
 <mapper namespace='application.user.mapper.UserMapper'>
+    <select id='select_by_id'>
+        SELECT * FROM t_user
+            WHERE 1=1
+            {% if name %}
+            AND name = {{ name | quote }}
+            {% endif %}
+            {% if id_list %}
+            AND id IN ({{ id_list | join(", ") }})
+            {% endif %}
+
+            {$ common_condition $}
+    </select>
+    <ref id='common_condition'>
+        SELECT * FROM t_user
+            WHERE 1=1
+            {% if name %}
+            AND name = {{ name | quote }}
+            {% endif %}
+            {% if id_list %}
+            AND id IN ({{ id_list | join(", ") }})
+            {% endif %}
+    </ref>
+    <update id='updateByUserName'>
+        update t_user set password=:password where name=:name
+    </update>
+    
+    <insert id='addUser'>
+        insert into 
+    </insert>
 </mapper>

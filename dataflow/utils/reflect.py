@@ -1,5 +1,6 @@
 from importlib import import_module
 from typing import Any, Optional, List, Type, get_origin, get_args,Callable,get_type_hints
+from types import FunctionType
 import importlib
 import pkgutil
 from dataflow.utils.log import Logger
@@ -27,6 +28,97 @@ def newInstance(fully_qualified_name: str, *args, **kwargs)->any:
     except (ValueError, ModuleNotFoundError, AttributeError) as e:
         raise RuntimeError(f"Cannot instantiate {fully_qualified_name}: {e}") from e
     return cls(*args, **kwargs)
+
+def getType(fully_qualified_name:str|type|object)->type:
+    try:
+        if isinstance(fully_qualified_name, str):
+            mod_name, cls_name = fully_qualified_name.rsplit(".", 1)
+            mod = import_module(mod_name)
+            cls = getattr(mod, cls_name)
+        elif isinstance(fully_qualified_name, type):
+            cls = fully_qualified_name
+        elif is_not_primitive(object):
+            cls = type(fully_qualified_name)
+        else:
+            raise RuntimeError(f"Cannot instantiate {fully_qualified_name}")
+    except (ValueError, ModuleNotFoundError, AttributeError) as e:
+        raise RuntimeError(f"Cannot instantiate {fully_qualified_name}: {e}")
+    return cls
+
+def getPydanticInstance(fully_qualified_name:str|type, properties:dict)->any:
+    cls = getType(fully_qualified_name)
+    if properties:
+        return cls(**property)
+    else:
+        return cls()
+
+def getInstance(fully_qualified_name:str|type, properties:dict)->any:
+    obj = newInstance(fully_qualified_name, *[], **properties)
+    return dict2obj(obj, properties)
+
+def is_instance_method(obj) -> bool:
+    return (
+        inspect.ismethod(obj) and          # 绑定方法
+        isinstance(obj.__self__, object) and  # 有实例宿主
+        not inspect.isclass(obj.__self__)     # 排除 @classmethod 的绑定类
+    )
+        
+def getTypeAttr(fully_qualified_name:str|type|object):
+    t = getType(fully_qualified_name)
+    return vars(t).items()
+    
+# 获取该类自己定义的所有实例方法（不包括继承的、不包括特殊方法如 __init__，或按需包括）。    
+def inspect_own_method(cls:type|str|object,excludePriviate:bool=True)->list:
+    cls_type = getType(cls)
+    methods = []
+    # for name, method in inspect.getmembers(cls_type, predicate=inspect.isfunction):
+    #     # print(f'{name} {method}')
+    #     # 只保留该类自己定义的（不是继承的）
+    #     if method.__qualname__.startswith(cls_type.__name__ + '.'):
+    #         if not excludePriviate or not name.startswith('_'):
+    #             methods.append((name, method))
+    # return methods    
+    
+    for name, attr_value in getTypeAttr(cls_type):
+        # print(f'{name} {attr_value}') 
+        
+        if isinstance(attr_value, FunctionType):
+            method = attr_value
+            if method.__qualname__.startswith(cls_type.__name__ + '.'):
+                # print(f'{method.__qualname__} {attr_value}')
+                if not excludePriviate or not name.startswith('_'):
+                    methods.append((name, method))
+    return methods
+
+
+def inspect_class_method(cls:type|str|object,excludePriviate:bool=True)->list:
+    cls_type = getType(cls)
+    methods = []    
+    # for name, value in dict(cls_type.__dict__).items():
+    #     print(f'{name} {value}')
+    # for name in dir(cls_type):
+    #     attr_value = getattr(cls_type, name)
+    #     print(f'{name} {attr_value}')
+    for name, attr_value in getTypeAttr(cls_type):
+        # print(f'{name} {attr_value}') 
+        if isinstance(attr_value, classmethod):
+            method = attr_value
+            if method.__qualname__.startswith(cls_type.__name__ + '.'):
+                if not excludePriviate or not name.startswith('_'):
+                    methods.append((name, method))
+    return methods
+
+def inspect_static_method(cls:type|str|object,excludePriviate:bool=True)->list:
+    cls_type = getType(cls)
+    methods = []
+    for name, attr_value in getTypeAttr(cls_type):        
+        # print(f'{type(attr_value)} {attr_value}')
+        if isinstance(attr_value, staticmethod):
+            method = attr_value
+            if method.__qualname__.startswith(cls_type.__name__ + '.'):
+                if not excludePriviate or not name.startswith('_'):
+                    methods.append((name, method))
+    return methods
 
 def getAttr(data:dict, field:str, dv:any=None)->any:
     if data is None:
