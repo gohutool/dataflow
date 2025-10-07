@@ -21,7 +21,8 @@ class SQLItem:
         self.options = options
     
     def __repr__(self):
-        return f'type={self.type} txt={self.txt} sql={self.sql} resultType={self.getReulstType()}[{self.resultType}] references={self.references} options={self.options}'
+        # return f'type={self.type} txt={self.txt} sql={self.sql} resultType={self.getReulstType()}[{self.resultType}] references={self.references} options={self.options}'
+        return f'type={self.type} txt={self.txt} sql={self.sql} resultType={self.getReulstType()}[{self.resultType}] references={self.references}'
     
     def hasReference(self):
         return self.references
@@ -45,12 +46,12 @@ class SQLItem:
 
 class XMLConfig:
     _ALL_CONFIG:dict[str,str] = {}
-    def __init__(self, namespace:str, sqls:dict[str,SQLItem]=None):
+    def __init__(self, namespace:str, sqls:dict[str,SQLItem]={}):
         self.namespace = namespace
         self.sqls = sqls
         self.references = {}        
         if sqls:
-            self.sqls.setdefault('id')
+            # self.sqls.setdefault('id')
             for k, sql in sqls.items():
                 if sql.type == 'ref':
                     self.references[k] = sql
@@ -58,7 +59,8 @@ class XMLConfig:
         self.ready = False
         
     def __repr__(self):
-        return f'namespace={self.namespace} sqls={self.sqls} ready={self.ready}'
+        # print('\n'.join(self.sqls.items()))
+        return f'namespace={self.namespace} sqls={'\n'.join(f'{k}: {v}' for k, v in self.sqls.items())} ready={self.ready}'
     
     def getSql(self, id:str)->str:
         return self.sqls.get(id)
@@ -86,7 +88,7 @@ class XMLConfig:
                 for o in _refers:
                     replace_k = o[0]
                     replace_id = o[1]
-                    _sql = _sql.replace(replace_k, dfs(replace_id))
+                    _sql = _sql.replace(replace_k, dfs(replace_id).sql)
                 raw.sql = _sql            
             else:
                 raw.sql = raw.txt
@@ -102,7 +104,7 @@ class XMLConfig:
     
     def binding_references(self):        
         self.references = XMLConfig.rebulid_references(self.references)
-        print(self.sqls)
+        # print(self.references)
         for k, v in self.sqls.items():
             v:SQLItem = v
             if not v.type == 'ref':
@@ -111,11 +113,11 @@ class XMLConfig:
                     for k in v.references:
                         replace_key = k[0]
                         ref_id = k[1]
-                        if ref_id not in self.sqls:
+                        if ref_id not in self.references:
                             raise KeyError(f'缺少 ref_id：{ref_id}')
                         else:                            
-                            ref_sql = self.sqls[ref_id].sql
-                            print(f'ref_id={ref_id} {ref_sql}')
+                            ref_sql = self.references[ref_id].sql
+                            # print(f'ref_id={ref_id} {ref_sql}')
                                                     
                         _sql = _sql.replace(replace_key, ref_sql)
                     v.sql = _sql
@@ -146,7 +148,7 @@ def _parse_xml(file:str)->XMLConfig:
     root = tree.getroot() 
     ns = root.attrib['namespace']
     
-    xmlConfig = XMLConfig(ns)
+    
     # sqlnodes = root.iter('sql')
     sqls = {}
     for sqlnode in root:
@@ -185,9 +187,8 @@ def _parse_xml(file:str)->XMLConfig:
         sqlItem = SQLItem(id, txt, nodeType, None, resultType, references, opt)
         sqls[sqlItem.id] = sqlItem
          
-    
-    xmlConfig.sqls = sqls
-        
+    xmlConfig = XMLConfig(ns, sqls)
+    # xmlConfig.sqls = sqls        
     return xmlConfig
     
     pass

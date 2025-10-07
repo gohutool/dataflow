@@ -8,19 +8,27 @@
             {% if id_list %}
             AND id IN ({{ id_list | join(", ") }})
             {% endif %}
-
             {$ common_condition $}
     </select>
     <ref id='common_condition'>
-        SELECT * FROM t_user
-            WHERE 1=1
-            {% if name %}
-            AND name = {{ name | quote }}
-            {% endif %}
-            {% if id_list %}
-            AND id IN ({{ id_list | join(", ") }})
-            {% endif %}
+        name = :name
+        {$ common_condition_1$}
+        {$ common_condition_2 $}
     </ref>
+    
+    <ref id='common_condition_1'>
+        And 1 = 1 
+        {$ common_condition_3 $}
+    </ref>
+
+    <ref id='common_condition_2'>
+        And age = :age AND type=:type 
+    </ref>
+
+    <ref id='common_condition_3'>
+        or age = :age AND type=:type 
+    </ref>
+
     <update id='updateByUserName'>
         update t_user set password=:password where name=:name
     </update>
