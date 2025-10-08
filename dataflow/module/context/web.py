@@ -197,6 +197,7 @@ def _register_all_filter(_app:FastAPI):
     # 排序：先按 order 升序，再按插入序号升序（先插入在前）
     # _filter.append((order, app, path, excludes, func, paths, _excludes))
     _filter.sort(key=lambda t: (t[0], t[2]), reverse=False)
+    # _filter = sorted(_filter, key=lambda t: (t[0], -_filter.index(t)))
     for v in _filter:
         _o,app,_path,_ex,func,paths,_excludes=v         
         app:FastAPI = app

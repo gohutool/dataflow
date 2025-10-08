@@ -1033,6 +1033,9 @@ if __name__ == "__main__":
     t = p.queryPage('select * from sa_security_realtime_daily where tradedate=:tradedate order by tradedate desc', {'tradedate':'2025-09-30'}, page=1, pagesize=10)
     print(json_to_str(t))
     
+    # _table = 'sys_user'
+    # t = p.queryOne(f'select * from {_table} where id=:id ', {'id', pk})
+    
     print(p.get_table_info('dataflow_test.sa_security_realtime_daily'))
     
     sample = '''

@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from typing import Self
 from dataflow.utils.utils import str_isEmpty
 from datetime import datetime, date
+from pydantic import BaseModel,Field
 
 # from jinja2 import Environment
 
@@ -16,6 +17,10 @@ from datetime import datetime, date
 #     lstrip_blocks=True,    # 去掉块级标签前的空白
 # )
 
+
+class PageMode(BaseModel):    
+    pageno: int = Field(..., min=1)  # 必填，长度限制
+    pagesize: int = 20
 
 
 _p = r'\{\$\s*.*?\s*\$\}'

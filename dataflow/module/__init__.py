@@ -183,7 +183,7 @@ class Context:
         
     
     @staticmethod
-    def Start_Context(app:FastAPI=None, application_yaml:str='conf/application.yaml', scan:str|list[str]='dataflow.application'):
+    def Start_Context(app:FastAPI=None, application_yaml:str='conf/application.yaml', scan:str|list[str]=None):
         if _contextContainer._webcontext is None:            
             WebContext.initContext(app)         
             
@@ -195,7 +195,7 @@ class Context:
         WebContext.Event.emit('loaded', app)
             
     @staticmethod
-    def Context(*,app:FastAPI, application_yaml:str='conf/application.yaml', scan:str|list[str]='dataflow.application'):
+    def Context(*,app:FastAPI, application_yaml:str='conf/application.yaml', scan:str|list[str]=None):
         Context.Start_Context(app, application_yaml, scan)                
         def decorator(func: Callable) -> Callable:            
             type_hints = get_type_hints(func)
@@ -497,6 +497,9 @@ class WebContext:
     
     @staticmethod
     def initContext(app: FastAPI):        
+        # if not app:
+        #     app = FastAPI()
+        #     _logger.ERROR(f'APP为空，默认初始化APP={app}')
         _contextContainer._webcontext = WebContext(app)
         _logger.INFO(f'实例化WEB容器={app} {_contextContainer._webcontext}')
             

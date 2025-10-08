@@ -28,7 +28,7 @@ context:
       - 50/hour
   database:
     ds01:
-      url: ${env:MYSQLDS.url:mysql+pymysql://u:p@localhost:61306/stock_agent?charset%20utf8mb4}
+      url: ${env:MYSQLDS.url:mysql+pymysql://u:p@localhost:61306/dataflow_test?charset%20utf8mb4}
       # url: ${env:MYSQLDS.url:mysql+pymysql://u:p@localhost:61306/stock_agent?charset=utf8mb4}
       username: ${env:MYSQLDS.user:stock_agent}
       password: ${env:MYSQLDS.password:1qaz2wsx}
