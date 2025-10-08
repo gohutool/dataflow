@@ -1,0 +1,100 @@
+from dataflow.utils.utils import ReponseVO, date_datetime_cn
+
+from dataflow.module import Context,WebContext
+from dataflow.utils.log import Logger
+from fastapi import FastAPI, Request, status, HTTPException # noqa: F401
+from fastapi.responses import JSONResponse
+from dataflow.module.context.web import limiter
+from dataflow.module.context.redis import RedisContext
+
+from application.test.service import ItemService, getInfos, UerService
+
+_logger = Logger('application.test.api')
+
+app:FastAPI = WebContext.getRoot()
+
+
+@app.get("/test")
+@limiter(rule='1/minute')
+async def test_endpoint(request:Request):
+    _logger.INFO('测试中间件顺序')
+    return JSONResponse(
+        status_code= status.HTTP_200_OK, 
+        content={"message": "测试中间件顺序"}
+    )
+    # return {"message": "测试中间件顺序"}  
+    
+
+@app.get("/test/redis/{itemid}")
+@RedisContext.redis_cache(ttl=60, prefix='cache:data:test:items')
+async def test_redis_cache(request:Request, itemid:str):
+    _logger.INFO('测试Redis_Cache组件')
+    return ReponseVO(data={"itemid":itemid, "time":date_datetime_cn()})
+
+
+@app.get("/test/redis_service/{itemid}")
+@RedisContext.redis_cache(ttl=60, prefix='cache:data:test:redis-items')
+async def test_service(request:Request, itemid:str):
+    _logger.INFO('测试Redis和UserService组件')
+    _is:UerService = Context.getContext().getBean('userService')    
+    return ReponseVO(data=_is.getItemInfo(itemid, 'redis_cache'))
+
+@app.get("/test/services/{itemid}")
+async def test_services(request:Request, itemid:str):
+    _logger.INFO('测试Services组件')    
+    return ReponseVO(data=getInfos(itemid))
+
+@app.get("/test/itemservice/{itemid}")
+async def test_services_reg(request:Request, itemid:str):
+    _logger.INFO('测试注册ItemService-Noname组件')    
+    _is:ItemService = Context.getContext().getBean('itemService-Noname')
+    return ReponseVO(data=_is.getItems(itemid))
+
+
+@app.get("/test/itemservice1/{itemid}")
+async def test_itemservice1(request:Request, itemid:str):
+    _logger.INFO('测试注册ItemService1组件')    
+    _is:ItemService = Context.getContext().getBean('itemService1')
+    return ReponseVO(data=_is.getItems(itemid))
+
+
+@app.get("/test/itemservice2/{itemid}")
+async def test_itemservice2(request:Request, itemid:str):
+    _logger.INFO('测试注册ItemService2组件')    
+    _is:ItemService = Context.getContext().getBean('itemService2')
+    return ReponseVO(data=_is.getItems(itemid))
+
+@app.get("/test/tx")
+async def test_tx(request:Request):
+    _logger.INFO('<<<<<<<<<<测试TX事务管理器')    
+    _is:UerService = Context.getContext().getBean('userService')
+    _is.test_tx_2()
+    _logger.INFO('>>>>>>>>>>测试TX事务管理器')
+    return '测试TX事务管理器'
+    
+
+
+@app.get("/test/exception")
+async def test_exception(request:Request):
+    _logger.INFO('测试Exception异常')
+    raise Exception('测试Exception异常')
+
+@app.api_route("/test/httpexception", methods=["GET", "POST"])
+async def test_httpexception(request:Request):
+    _logger.INFO('测试HttpException异常')
+    raise HTTPException(501, detail='测试HttpException异常')
+
+
+@app.get("/test/context_value")
+async def test_context_value(request:Request):
+    _logger.INFO('测试Value组件')
+    return ReponseVO(data=Context.Value('${env:LANGFUSE.secret_key:1-sk-lf-b60f4b33-ff5a-46ac-9086-e776373c86da}'))
+
+
+@app.get("/test/getrequest")
+async def test_get_request():
+    _logger.INFO('测试获取Request组件')
+    request = WebContext.getRequest()
+    return ReponseVO(data={"base_url":request.base_url, 
+                           'method': request.method})
+        

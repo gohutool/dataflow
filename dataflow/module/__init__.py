@@ -551,6 +551,9 @@ def _assemble_bindding_service(context:Context, modules:list):
         _aw:Context.Autowired = v[1]
         _name = v[2]
         _owner = v[3]
+        
+        _logger.DEBUG(f'AUTOWIRED装载{k}={v}')
+        
         if _typ is None and str_isEmpty(_aw.name) and str_isEmpty(_name):
             raise Exception(f'{get_fullname(_owner)}注入{_name}属性失败，必须指定Type或者使用Name进行实例化')
         

@@ -147,7 +147,8 @@ def init_error_handler(app:FastAPI):
     
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc:HTTPException):
-        _logger.ERROR(f'处理HttpExpcetion: {exc}', exc)
+        # _logger.ERROR(f'处理HttpExpcetion: {exc}', exc)
+        _logger.ERROR(f'处理Expcetion: {exc}')
         return CustomJSONResponse(            
             status_code=exc.status_code,
             # content={"code": exc.status_code, "message": exc.detail}
@@ -158,6 +159,7 @@ def init_error_handler(app:FastAPI):
     @app.exception_handler(Exception)
     async def exception_handler(request: Request, exc:Exception):
         _logger.ERROR(f'处理Expcetion: {exc}', exc)
+        # _logger.ERROR(f'处理Expcetion: {exc}')
         code = getattr(exc, 'code') if hasattr(exec, 'code') else 500
         return CustomJSONResponse(
             status_code=code,
@@ -167,7 +169,9 @@ def init_error_handler(app:FastAPI):
               
     # 覆盖 HTTPException
     @app.exception_handler(StarletteHTTPException)
-    async def http_fastapi_exception_handler(request: Request, exc:StarletteHTTPException):
+    async def http_fastapi_exception_handler(request: Request, exc:StarletteHTTPException):        
+        # _logger.ERROR(f'处理Expcetion: {exc}', exc)
+        _logger.ERROR(f'处理Expcetion: {exc}')
         return CustomJSONResponse(
             status_code=exc.status_code,
             # content={"code": exc.status_code, "message": exc.detail}
@@ -176,7 +180,9 @@ def init_error_handler(app:FastAPI):
   
     # 覆盖校验错误
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request: Request, exc:RequestValidationError):
+    async def validation_exception_handler(request: Request, exc:RequestValidationError):        
+        # _logger.ERROR(f'处理Expcetion: {exc}', exc)
+        _logger.ERROR(f'处理Expcetion: {exc}')
         return CustomJSONResponse(
             status_code=422,
             # content={"code": 422, "message": "参数校验失败", "errors": exc.errors()}
@@ -227,7 +233,7 @@ def _register_all_filter(_app:FastAPI):
                     except StarletteHTTPException as e:
                         raise e
                     except Exception as e:
-                        raise Context.ContextExceptoin(detail=e.__str__())
+                        raise Context.ContextExceptoin(detail=e.__str__()) from e
                     
             app.add_middleware(BaseHTTPMiddleware, dispatch=new_func)   
             
@@ -251,8 +257,8 @@ def init_web_common_filter(app:FastAPI):
         except StarletteHTTPException as e:
             raise e
         except Exception as e:
-            _logger.ERROR(f"[{rid}] {request.method} {request.url}", e)
-            raise Context.ContextExceptoin(detail=e.__str__())
+            # _logger.ERROR(f"[{rid}] {request.method} {request.url}", e)
+            raise Context.ContextExceptoin(detail=e.__str__()) from e
         
         _logger.INFO(f"[{rid}] {request.method} {request.url}")        
         return response    

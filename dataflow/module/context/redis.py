@@ -1,5 +1,6 @@
 from dataflow.module import Context
 from dataflow.utils.log import Logger
+from dataflow.utils.reflect import get_fullname
 from dataflow.utils.dbtools.redis import RedisTools, initRedisWithConfig
 from typing import Callable
 import functools
@@ -16,7 +17,7 @@ class RedisContext:
     ENABLED:bool = False
     @staticmethod    
     def getTool(ds_name:str=None)->RedisTools:                
-        return Context.getContext().getBean('redis')
+        return Context.getContext().getBean(get_fullname(RedisTools))
     @staticmethod ## 过期时间（秒）
     def redis_cache(*,ttl:int=None,prefix:str=None,single:bool=False):
         rs_prefix = None
@@ -67,7 +68,7 @@ def _init_redis_context(config):
     if c:
         _logger.INFO(f'初始化Redis源{prefix}[{c}]开始')
         r = initRedisWithConfig(c)            
-        Context.getContext().registerBean('redis', r)
+        Context.getContext().registerBean(get_fullname(RedisTools), r)
         _logger.INFO(f'初始化Redis源{prefix}[{c}]={r}结束')      
         RedisContext.ENABLED = True  
     else:
