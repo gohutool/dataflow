@@ -845,7 +845,7 @@ class TX:
         self._rollback_for = rollback_for if isinstance(rollback_for, tuple) else (rollback_for,)
     
     def __call__(self, func: Callable) -> Callable:
-        _logger.DEBUG(f'创建TX装饰器,隔离级别={self._propagation}')
+        _logger.DEBUG(f'创建TX装饰器,隔离级别={self._propagation}=>{self._propagation.value}')
         return self._async_wrapper(func) if inspectoin.iscoroutinefunction(func) else self._sync_wrapper(func)
     
     def _handle_when_expcetion(self, func:Callable, need_end, *args, **kwargs):
@@ -898,17 +898,17 @@ class TX:
         def wrapper(*args, **kwargs):
             need_end = False
             
-            if self._propagation == Propagation.SUPPORTS:
+            if self._propagation.value == Propagation.SUPPORTS.value:
                 _logger.DEBUG('事务Propagation.SUPPORTS')
                 return self._handle_when_expcetion(func, need_end, *args, **kwargs)
-            elif self._propagation == Propagation.REQUIRES_NEW:
+            elif self._propagation.value == Propagation.REQUIRES_NEW.value:
                 cur_session = self._session_factory.createSession()
                 need_end = True                          
                 self._session_factory.beginSession(cur_session)
                 _logger.DEBUG('事务Propagation.REQUIRES_NEW')
                 with cur_session.begin():
                     return self._handle_when_expcetion(func, need_end, *args, **kwargs)
-            elif self._propagation == Propagation.REQUIRED:
+            elif self._propagation.value == Propagation.REQUIRED.value:
                 cur_session = self._session_factory.getSession()
                 if cur_session is None:
                     cur_session = self._session_factory.createSession()
@@ -925,11 +925,11 @@ class TX:
                     else:
                         _logger.DEBUG('事务Propagation.REQUIRED->USED_CURRENT')
                         return self._handle_when_expcetion(func, need_end, *args, **kwargs)
-            elif self._propagation == Propagation.NEVER:
+            elif self._propagation.value == Propagation.NEVER.value:
                 cur_session = self._session_factory.getSession()
                 if cur_session:
                     raise Exception('已经启动了事务，NEVER不支持活动事务')   
-            elif self._propagation == Propagation.MANDATORY:
+            elif self._propagation.value == Propagation.MANDATORY.value:
                 cur_session = self._session_factory.getSession()
                 if not cur_session:
                     raise Exception('没有启动事务，MANDATORY必须已经启动事务')     
@@ -1011,6 +1011,11 @@ class TX:
 # KingBase	ksycopg2	kingbase+ksycopg2://u:p@host:54321/db
 
 if __name__ == "__main__":    
+    
+    p:Propagation=Propagation.REQUIRED
+    
+    print(f'{p}=>{p.value}')
+    
     url = make_url('postgresql+psycopg2://root:12345@host:5432/db?charset=utf8')    
     print(url)
     url = url.set(username='liuyong')

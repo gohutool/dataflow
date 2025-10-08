@@ -148,7 +148,7 @@ def init_error_handler(app:FastAPI):
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc:HTTPException):
         # _logger.ERROR(f'处理HttpExpcetion: {exc}', exc)
-        _logger.ERROR(f'处理Expcetion: {exc}')
+        _logger.WARN(f'处理HTTPException: {exc}')
         return CustomJSONResponse(            
             status_code=exc.status_code,
             # content={"code": exc.status_code, "message": exc.detail}
@@ -171,7 +171,7 @@ def init_error_handler(app:FastAPI):
     @app.exception_handler(StarletteHTTPException)
     async def http_fastapi_exception_handler(request: Request, exc:StarletteHTTPException):        
         # _logger.ERROR(f'处理Expcetion: {exc}', exc)
-        _logger.ERROR(f'处理Expcetion: {exc}')
+        _logger.WARN(f'处理StarletteHTTPExceptionn: {exc}')
         return CustomJSONResponse(
             status_code=exc.status_code,
             # content={"code": exc.status_code, "message": exc.detail}
@@ -181,8 +181,8 @@ def init_error_handler(app:FastAPI):
     # 覆盖校验错误
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc:RequestValidationError):        
-        # _logger.ERROR(f'处理Expcetion: {exc}', exc)
-        _logger.ERROR(f'处理Expcetion: {exc}')
+        # _logger.ERROR(f'处理RequestValidationError: {exc}', exc)
+        _logger.WARN(f'处理Expcetion: {exc}')
         return CustomJSONResponse(
             status_code=422,
             # content={"code": 422, "message": "参数校验失败", "errors": exc.errors()}

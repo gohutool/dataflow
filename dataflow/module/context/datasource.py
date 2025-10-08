@@ -1,14 +1,24 @@
 from dataflow.module import Context, Bean
-from dataflow.utils.dbtools.pydbc import PydbcTools,Propagation, TX as _tx
+from dataflow.utils.dbtools.pydbc import PydbcTools,Propagation as _Propagation, TX as _tx
 
 from dataflow.utils.utils import str_isEmpty
 from dataflow.utils.log import Logger
 from dataflow.utils.reflect import get_fullname
 from typing import Union,Type,Tuple
+from enum import Enum
 
 prefix = 'context.database'
 
 _logger = Logger('dataflow.module.context.datasource')
+
+class Propagation(Enum):    
+    """事务传播行为"""
+    REQUIRED = _Propagation.REQUIRED.value  # "REQUIRED"        # 支持当前事务，如果不存在则创建新事务
+    REQUIRES_NEW = _Propagation.REQUIRES_NEW.value  # "REQUIRES_NEW" # 总是创建新事务
+    SUPPORTS = _Propagation.SUPPORTS.value   # "SUPPORTS"        # 支持当前事务，如果不存在则以非事务方式执行
+    NOT_SUPPORTED = _Propagation.NOT_SUPPORTED.value # "NOT_SUPPORTED" # 以非事务方式执行，挂起当前事务
+    MANDATORY = _Propagation.MANDATORY.value  # "MANDATORY"      # 必须存在当前事务，否则抛出异常
+    NEVER = _Propagation.NEVER.value  # "NEVER"              # 必须不存在事务，否则抛出异常
 
 class DataSourceContext:
     @staticmethod
@@ -36,7 +46,7 @@ def TX(tx_name:str=None, *, propagation:Propagation=Propagation.REQUIRED,rollbac
         tx = Bean(get_fullname(TransactionManager))
         
     tx:TransactionManager = tx    
-    return _tx(tx._pydbc, propagation, rollback_for)
+    return _tx(tx._pydbc, propagation=propagation, rollback_for=rollback_for)
 
 @Context.Configurationable(prefix=prefix)
 def _init_datasource_context(config):

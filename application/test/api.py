@@ -70,7 +70,7 @@ async def test_tx(request:Request):
     _is:UerService = Context.getContext().getBean('userService')
     _is.test_tx_2()
     _logger.INFO('>>>>>>>>>>测试TX事务管理器')
-    return '测试TX事务管理器'
+    return ReponseVO(data='测试TX事务管理器')
     
 
 

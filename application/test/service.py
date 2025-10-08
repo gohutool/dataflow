@@ -3,6 +3,7 @@ from dataflow.utils.utils import current_millsecond,str_to_json
 from dataflow.module import Context
 from dataflow.utils.dbtools.pydbc import PydbcTools
 from dataflow.utils.dbtools.pydbc import NULL, SimpleExpression
+from dataflow.module.context.datasource import TX, Propagation
 import time
 
 _logger = Logger('application.test.service')
@@ -14,6 +15,7 @@ class UerService:
         _logger.DEBUG(f'调用UerService参数={name}')
         return self.pydbc.queryOne('select * from sa_security_realtime_daily where code=:code order by tradedate desc limit 1', {'code':item_id})
     
+    @TX(propagation=Propagation.REQUIRES_NEW)
     def test_tx_3(self):
         _logger.DEBUG("BEGIN TX3 ========================")
         sample = '''
@@ -22,12 +24,12 @@ class UerService:
         sample:dict = str_to_json(sample)
         sample['low']=NULL    
         sample['tradedate']='2025-01-05'
-        sample['code']=f'3_{current_millsecond()}'
+        sample['code']=f'3_{current_millsecond()}'        
         rtn = self.pydbc.insertT('dataflow_test.sa_security_realtime_daily', sample)        
         _logger.DEBUG(f"END TX3 Result={rtn}  {sample}")
-        time.sleep(60)
+        time.sleep(30)
         
-    
+    @TX()
     def test_tx_2(self):
         _logger.DEBUG("BEGIN TX2 ========================")
         
@@ -48,11 +50,12 @@ class UerService:
                         
         sample:dict = str_to_json(sample)
         sample['code']=f'2_{current_millsecond()}'
-        rtn = self.pydbc.insertT('dataflow_test.sa_security_realtime_daily', sample)     
-        time.sleep(0.1)
+        sample['tradedate']='2025-01-04'
+        rtn = self.pydbc.insertT('dataflow_test.sa_security_realtime_daily', sample)             
+        time.sleep(30)
         self.test_tx_3()
-        time.sleep(60)
-        _logger.DEBUG("END TX2 ========================")
+        time.sleep(30)
+        _logger.DEBUG(f"END TX2 Result={rtn}  {sample}")
     
 class ItemService:
     userService:UerService=Context.Autowired(name='userService')
