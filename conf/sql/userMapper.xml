@@ -1,4 +1,21 @@
 <mapper namespace='application.user.mapper.UserMapper'>
+    <select id='say' resultType='dict'>
+       {$ for_test $}
+    </select>
+
+    <ref id='for_test'>
+        SELECT user_name FROM sys_user
+                    WHERE 1=1
+                    {% if name %}
+                    AND name = :name
+                    {% endif %}
+                   
+    </ref>
+    
+    <select id='run'>
+        {$ for_test $}
+    </select>
+
     <select id='select_by_id'>
         SELECT * FROM t_user
             WHERE 1=1

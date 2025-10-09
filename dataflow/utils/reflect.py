@@ -135,6 +135,26 @@ def getAttr(data:dict, field:str, dv:any=None)->any:
         
     return rtn
 
+def is_user_defined(cls):
+    """
+    判断 cls 是不是用户自定义的类（非 built-in）。
+    参数 cls 可以是类对象，也可以是 type 对象。
+    """
+    return is_user_object(cls)
+    # return cls.__module__ != 'builtins'
+
+def isList(obj:type|object)->bool:
+    typ = getType(obj)
+    return issubclass(get_origin(typ) or typ, list)
+
+def isDict(obj:type|object)->bool:
+    typ = getType(obj)
+    return issubclass(get_origin(typ) or typ, dict)
+
+def isType(obj:type|object, pType:type)->bool:
+    typ = getType(obj)
+    return issubclass(get_origin(typ) or typ, pType)
+
 def getAttrPlus(data:dict, field:str, dv:any=None)->any:
     if data is None:
         return dv
@@ -347,11 +367,23 @@ def bind_call_parameter(func:Callable, args:list, kwargs:dict, bind_func:Callabl
 # 定义原始类型
 primitive_types = (int, float, bool, str, type(None))
 
-def is_user_object(obj):
-    return hasattr(type(obj), '__dict__') and not inspect.isbuiltin(obj)
+def is_user_object(obj:type|object):
+    if is_not_primitive(obj):
+        if isinstance(obj, type):
+            return hasattr(obj, '__dict__') and not getattr(obj, '__module__', None) == 'builtins'
+        
+        return is_user_object(type(obj))
+        # return hasattr(type(obj), '__dict__') and not inspect.isbuiltin(obj)
+    else:
+        return False
 
-def is_not_primitive(obj):
-    return not isinstance(obj, primitive_types)
+def is_not_primitive(obj:type|object):
+    if isinstance(obj, type):
+        origin = getattr(obj, '__origin__', None) or obj
+        return not issubclass(origin, primitive_types)
+    
+    return is_not_primitive(type(obj))
+    # return not isinstance(obj, primitive_types)
 
 # ------------------- demo -------------------
 if __name__ == '__main__':
@@ -382,3 +414,16 @@ if __name__ == '__main__':
     
     print(get_methodname(get_methodname))    
     print(get_methodname(getAttrPlus))
+    
+    # print(is_user_object(int))
+    # print(is_user_object(1))
+    print(is_user_object(dict))
+    print(is_user_object({}))
+    print(is_user_object(Logger))
+    print(is_user_object(_logger))
+    
+    
+    print(is_not_primitive(dict))
+    print(is_not_primitive({}))
+    print(is_not_primitive(Logger))
+    print(is_not_primitive(_logger))

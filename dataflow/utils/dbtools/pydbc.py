@@ -303,7 +303,7 @@ class PydbcTools:
                         
                 return PageResult(total, pagesize, 1, (total + pagesize - 1)//pagesize, list)
 
-    def update(self, sql, params=None):
+    def update(self, sql, params=None, autokey=None):
         _logger.DEBUG(f"[SQL]:{sql}")
         _logger.DEBUG(f"[Parameter]:{params}")
         
@@ -311,9 +311,12 @@ class PydbcTools:
             with self.engine.begin() as connection:
                 _logger.DEBUG('自省事务处理')
                 try:
-                    results = connection.execute(text(sql), params)
-                    
-                    connection.commit()
+                    results = connection.execute(text(sql), params)                    
+                    connection.commit()    
+                    if not str_isEmpty(autokey):
+                        inserted_id = self._get_last_insert_id(connection, "", autokey)
+                        if params is not None:
+                            params[autokey] = inserted_id
                     return results.rowcount
                 except Exception as e:
                     connection.rollback()
@@ -329,8 +332,8 @@ class PydbcTools:
                 _logger.ERROR("[Exception]", e)
                 raise e
             
-    def insert(self, sql, params=None):
-        return self.update(sql, params)
+    def insert(self, sql, params=None, autokey:str=None):
+        return self.update(sql, params, autokey)
 
     def delete(self, sql, params=None):
         return self.update(sql, params)
@@ -920,11 +923,12 @@ class TX:
                 else:
                     if cur_session.in_transaction:
                         with cur_session.begin_nested():
-                            _logger.DEBUG('事务Propagation.REQUIRED->USED_CURRENT')
+                            _logger.DEBUG('事务Propagation.REQUIRED->USED_NEW')
                             return self._handle_when_expcetion(func, need_end, *args, **kwargs)
                     else:
-                        _logger.DEBUG('事务Propagation.REQUIRED->USED_CURRENT')
-                        return self._handle_when_expcetion(func, need_end, *args, **kwargs)
+                        with cur_session.begin():
+                            _logger.DEBUG('事务Propagation.REQUIRED->USED_CURRENT')
+                            return self._handle_when_expcetion(func, need_end, *args, **kwargs)
             elif self._propagation.value == Propagation.NEVER.value:
                 cur_session = self._session_factory.getSession()
                 if cur_session:

@@ -10,8 +10,10 @@ _matcher = AntPathMatcher()
 def match(pattern, txt):
     return _matcher.match(pattern, txt)
 
-def find(root:str, pattern:str=None):    
-    root_p = str(Path(root)).replace('\\', '/')
+def find(root:str, pattern:str=None)->list[tuple[str, Path]]:
+    root_p = str(Path(root).absolute()).replace('\\', '/')
+    
+    # print(f'============== {root_p}')
     
     if not str_isEmpty(pattern) and not pattern.startswith('/'):
         pattern = '/' + pattern
@@ -19,20 +21,22 @@ def find(root:str, pattern:str=None):
     
     rtn = []
     needP = False if str_isEmpty(pattern) else True
-    for dirpath, dirnames, filenames in os.walk(root):
+    for dirpath, dirnames, filenames in os.walk(root_p):
         p = Path(dirpath)
-        p_s = str(p).replace('\\', '/')
-        p_s = re.sub(r'^'+root_p, '', p_s, flags=re.MULTILINE)
+        p_s_o = str(p.absolute()).replace('\\', '/')
+        p_s = re.sub(r'^'+root_p+'/', '/', p_s_o)        
+        # print(f'dir={p_s_o} {p_s}, {root_p}')
         if not needP or match(pattern, p_s):
             if p_s:
-                rtn.append(p_s)
+                rtn.append((p_s, p))
         
         for f in filenames:
             p1 = Path(dirpath+ '/' + f)
-            p1_s = str(p1).replace('\\', '/')
-            p1_s = re.sub(r'^'+root_p, '', p1_s, flags=re.MULTILINE)
+            p1_s_o = str(p1.absolute()).replace('\\', '/')
+            p1_s = re.sub(r'^'+root_p+'/', '/', p1_s_o)
+            # print(f'file={p1_s_o} {p1_s}, {root_p}')
             if not needP or match(pattern, p1_s):
-                rtn.append(p1_s)
+                rtn.append((p1_s, p1))
                 
     return rtn
 
@@ -62,6 +66,6 @@ if __name__ == "__main__":
     #         p1 = Path(dirpath+ '/' + f)
     #         print(f'{p1} {str(p1).replace('\\', '/')}')
             
-    rtn = find('conf', '**/sql/**')
+    rtn = find('./conf', '**/user*.xml')
     for o in rtn:
         print(o)
