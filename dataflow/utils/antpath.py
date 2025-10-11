@@ -21,7 +21,7 @@ def find(root:str, pattern:str=None)->list[tuple[str, Path]]:
     
     rtn = []
     needP = False if str_isEmpty(pattern) else True
-    for dirpath, dirnames, filenames in os.walk(root_p):
+    for dirpath, dirnames, filenames in os.walk(root):
         p = Path(dirpath)
         p_s_o = str(p.absolute()).replace('\\', '/')
         p_s = re.sub(r'^'+root_p+'/', '/', p_s_o)        

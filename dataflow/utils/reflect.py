@@ -7,6 +7,7 @@ from dataflow.utils.log import Logger
 from dataflow.utils.utils import current_millsecond
 import sys 
 import inspect
+from datetime import datetime,date
 
 _logger = Logger('dataflow.utils.reflect')
 
@@ -365,7 +366,7 @@ def bind_call_parameter(func:Callable, args:list, kwargs:dict, bind_func:Callabl
     pass
 
 # 定义原始类型
-primitive_types = (int, float, bool, str, type(None))
+primitive_types = (int, float, bool, str, type(None), date, datetime)
 
 def is_user_object(obj:type|object):
     if is_not_primitive(obj):

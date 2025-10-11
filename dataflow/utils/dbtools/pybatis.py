@@ -14,6 +14,7 @@ from dataflow.utils.reflect import inspect_own_method, inspect_class_method, ins
 from dataflow.utils.dbtools.pydbc import PydbcTools
 from typing import get_type_hints
 import inspect
+import functools
 
 
 _logger = Logger('dataflow.utils.dbtools.pybatis')
@@ -34,6 +35,25 @@ class PageMode(BaseModel):
 
 _p = r'\{\$\s*.*?\s*\$\}'
 _ip = r'^\{\$\s*|\s*\$\}$'
+
+def _get_result_type(resultType:str):    
+    if str_isEmpty(resultType):
+        return dict
+    if resultType == 'int':
+        return int
+    if resultType == 'str':
+        return str
+    if resultType == 'float':
+        return float
+    if resultType == 'dict':
+        return dict
+    if resultType == 'list':
+        return list
+    if resultType == 'datetime':
+        return datetime
+    if resultType == 'date':
+        return date        
+    return getType(resultType)
 
 class SQLItem:
     class SQLType(Enum):
@@ -63,23 +83,24 @@ class SQLItem:
         return self.sqlTemplate.render(data)
     
     def getReulstType(self):
-        if str_isEmpty(self.resultType):
-            return dict
-        if self.resultType == 'int':
-            return int
-        if self.resultType == 'str':
-            return str
-        if self.resultType == 'float':
-            return float
-        if self.resultType == 'dict':
-            return dict
-        if self.resultType == 'list':
-            return list
-        if self.resultType == 'datetime':
-            return datetime
-        if self.resultType == 'date':
-            return date        
-        return getType(self.resultType)
+        return _get_result_type(self.resultType)
+        # if str_isEmpty(self.resultType):
+        #     return dict
+        # if self.resultType == 'int':
+        #     return int
+        # if self.resultType == 'str':
+        #     return str
+        # if self.resultType == 'float':
+        #     return float
+        # if self.resultType == 'dict':
+        #     return dict
+        # if self.resultType == 'list':
+        #     return list
+        # if self.resultType == 'datetime':
+        #     return datetime
+        # if self.resultType == 'date':
+        #     return date        
+        # return getType(self.resultType)
 
 
 class XMLConfig:
@@ -258,10 +279,107 @@ def _parse_xml(file:str)->XMLConfig:
         sqls[sqlItem.id] = sqlItem
          
     xmlConfig = XMLConfig(ns, sqls)
+    
+    _logger.DEBUG(f'Mapper文件{file}解析到{len(sqls)}个SQL模板')
     # xmlConfig.sqls = sqls        
     return xmlConfig
     
-def _binding_function_with_pybatis(cls, func_name:str, func:callable, xmlCOnfig:XMLConfig, ds:PydbcTools):
+def _binding_sql_with_func(func:callable, sql:str, sqlType:str, resultType:type, ds:PydbcTools, options:dict={}):    
+    sig = inspect.signature(func)        
+    # params = sig.parameters               # 2. 有序参数字典
+    # return_ann = sig.return_annotation  
+    type_hints = get_type_hints(func)
+    
+    # sqlType:str = sqlItem.type
+    # resultType:type = sqlItem.getReulstType()
+    return_type = type_hints.get('return') or resultType or dict 
+    _sqlTemplate = Template(sql, trim_blocks=True, lstrip_blocks=True)
+    # if sqlType == 'select':        
+
+    @functools.wraps(func)        
+    def _sql_proxy(*args, **kwargs)->any:
+        bound = sig.bind_partial(*args, **kwargs)
+        bound.apply_defaults()        
+        _logger.DEBUG(f'{bound.arguments}=>{return_type}')
+        # bound.arguments.pop('self')        
+        sql = _sqlTemplate.render(bound.arguments)
+        
+        if sqlType == SQLItem.SQLType.DELETE: 
+            return ds.delete(sql, bound.arguments)
+        elif sqlType == SQLItem.SQLType.UPDATE: 
+            return ds.update(sql, bound.arguments)
+        elif sqlType == SQLItem.SQLType.INSERT: 
+            autokey = None
+            if options and 'autoKey' in options:
+                autokey = options['autoKey']
+            return ds.insert(sql, bound.arguments, autokey)
+        elif sqlType == SQLItem.SQLType.SELECT:
+            pageMode = None
+            for k,v in bound.arguments.items():
+                if isinstance(v, PageMode) or isinstance(sig.parameters[k], PageMode):
+                    pageMode = v
+            _isList = False
+            _isPage = False
+            if isList(return_type):
+                _isList = True                                                                        
+            if isType(return_type, PageResult) or pageMode:
+                _isList = True
+                _isPage = True
+                
+            print(f'================ _isPage={_isPage} _isList={_isList} return_type={return_type} resultType={resultType}')                                
+            if _isPage:
+                if pageMode is None:
+                    pageMode = PageMode(pageno=1)                    
+                rtn = ds.queryPage(sql, bound.arguments, pageMode.pageno, pageMode.pagesize)
+                
+                if not rtn.list:
+                    return rtn
+                
+                if is_not_primitive(resultType):                    
+                    if is_user_defined(resultType):
+                        _l = [getInstance(resultType, one) for one in rtn]
+                        rtn.list = _l
+                        return rtn
+                    else:
+                        return rtn
+                else:
+                    _l = [next(iter(one.values())) for one in rtn.list]
+                    rtn.list = _l
+                    return rtn
+            else:
+                if _isList:
+                    rtn = ds.queryMany(sql, bound.arguments)
+                    if not rtn :
+                        return rtn
+                    
+                    if is_not_primitive(resultType):
+                        if is_user_defined(resultType):
+                            _l = [getInstance(resultType, one) for one in rtn]
+                            return _l
+                        else:
+                            return rtn                        
+                    else:
+                        _l = [next(iter(one.values())) for one in rtn]
+                        return _l
+                else:
+                    rtn = ds.queryOne(sql, bound.arguments)
+                    if rtn is None:
+                        return rtn
+                    else:
+                        if is_not_primitive(return_type):
+                            if isType(return_type, dict):
+                                return rtn
+                            else:
+                                return getInstance(return_type, rtn)
+                        else:
+                            return next(iter(rtn.values()))
+                            
+        return func(*args, **kwargs)
+        
+    return _sql_proxy
+
+    
+def _binding_function_with_pybatis(cls, func_name:str, func:callable, xmlConfig:XMLConfig, ds:PydbcTools):
     _logger.DEBUG(f'{func_name}.{func}')
     
     sig = inspect.signature(func)        
@@ -269,7 +387,7 @@ def _binding_function_with_pybatis(cls, func_name:str, func:callable, xmlCOnfig:
     # return_ann = sig.return_annotation  
     type_hints = get_type_hints(func)
     
-    sqlItem:SQLItem = xmlCOnfig.getSql(func_name)
+    sqlItem:SQLItem = xmlConfig.getSql(func_name)
     sqlType:str = sqlItem.type
     resultType:type = sqlItem.getReulstType()
     return_type = type_hints.get('return') or resultType or dict 
@@ -309,7 +427,7 @@ def _binding_function_with_pybatis(cls, func_name:str, func:callable, xmlCOnfig:
             print(f'================ _isPage={_isPage} _isList={_isList} return_type={return_type} resultType={resultType}')                                
             if _isPage:
                 if pageMode is None:
-                    pageMode = PageMode(1)                    
+                    pageMode = PageMode(pageno=1)                    
                 rtn = ds.queryPage(sql, bound.arguments, pageMode.pageno, pageMode.pagesize)
                 
                 if not rtn.list:
@@ -424,21 +542,19 @@ def Mapper(datasource:PydbcTools, *, namespace:str=None, table:str=None,id_col='
     return mapper_decorator
 
 
-XMLConfig.scan_mapping_xml('conf', '**/*Mapper.xml')
-
-url = 'mysql+pymysql://u:p@localhost:61306/dataflow_test?charset=utf8mb4'
-p = PydbcTools(url=url, username='stock_agent', password='1qaz2wsx', test='select 1')    
-
-@Mapper(p, namespace='application.user.mapper.UserMapper',table='sys_user',id_col='user_id')
-class TestMapper:    
-    def __init__(self, name:str='LiuYong'):
-        self.name = name
-        
-    def say(self, word)->list:
-        return f'{self.name} Say: {word}'
+def SELECT(datasource:PydbcTools, sql:str=None, *, resultType:type|str=dict):
+    if isinstance(resultType, str):
+        resultType = _get_result_type(resultType)
     
-    def run(self, road)->str:
-        return f'{self.name} run: {road}'
+    def decorator(func:callable)->callable:        
+        return _binding_sql_with_func(func, sql, SQLItem.SQLType.SELECT, resultType=resultType, ds=datasource, options={})
+    return decorator
+
+def UPDATE(datasource:PydbcTools, *, sql:str=None):
+    def decorator(func:callable)->callable:        
+        return _binding_sql_with_func(func, sql, SQLItem.SQLType.UPDATE, resultType=int, ds=datasource, options={})
+    return decorator
+
 
 if __name__ == "__main__":
     
@@ -483,17 +599,41 @@ if __name__ == "__main__":
     print(inspect_static_method(t))
     print(inspect_class_method(t))
     
+    XMLConfig.scan_mapping_xml('conf', '**/*Mapper.xml')
+
+    url = 'mysql+pymysql://u:p@localhost:61306/dataflow_test?charset=utf8mb4'
+    p = PydbcTools(url=url, username='stock_agent', password='1qaz2wsx', test='select 1')    
+
+    @Mapper(p, namespace='application.user.mapper.UserMapper',table='sys_user',id_col='user_id')
+    class TestMapper:    
+        def __init__(self, name:str='LiuYong'):
+            self.name = name
+            
+        def say(self, word, pageMode:PageMode)->PageResult:
+            return f'{self.name} Say: {word}'
+        
+        def run(self, road)->str:
+            return f'{self.name} run: {road}'
 
     print('== start')
     t = TestMapper('LiuYong')
     print(dir(t))    
     print(t.select_by_id('2'))
-    print(f'Say={t.say('Liuyong')}')
+    print(f'Say={t.say('Liuyong', PageMode(pageno=2))}')
     print(f'Run={t.run('Shenzhen')}')
+    
+    @SELECT(p, 'select * from sys_user where user_name=:name and sex=:sex',resultType=dict)
+    def select_test(name:str, sex:int, pm:PageMode):
+        pass
+    
+    @UPDATE(p, sql='update sys_user set sex=sex where sex=:old_sex and sex<>:new_sex') 
+    def update_test(old_sex:int, new_sex:int):
+        pass
+    
+    print(select_test('ry', 1))
+    print(update_test('1', 0))
     
     # t = TestMapper('Dataflow')
     # print(t.select_by_id('2'))
     # print(f'Say={t.say('Liuyong')}')
     # print(f'Run={t.run('Shenzhen')}')
-
-
