@@ -65,6 +65,11 @@ context:
       allow_methods: '*'
       allow_header: '*'
       allow_credentials: yes
+  stream:
+    kafka:
+      bootstrap-servers: 192.168.18.145:9092
+      producer:        
+      consumer:
   test:
     web:
       title: DataFlow
