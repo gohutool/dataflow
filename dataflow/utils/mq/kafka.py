@@ -165,7 +165,7 @@ if __name__ == "__main__":
     print('start')
     
     test_consumer()
-    test_producer()
+    # test_producer()
         
     input('输入任何字符退出')
     print('退出')
