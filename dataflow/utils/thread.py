@@ -1,13 +1,15 @@
 import time
 import threading
 from dataflow.utils.log import Logger
+from dataflow.utils.utils import str_isEmpty
+from dataflow.utils.reflect import get_methodname
 from typing import Optional,Callable,Any, Dict
 import functools
-
 import queue
 import uuid
 from dataclasses import dataclass
 from enum import Enum
+import atexit
 
 
 _logger = Logger('dataflow.utils.thread')
@@ -211,42 +213,82 @@ class ThreadPool:
                 'shutdown': self.shutdown_flag
             }
 
-# 使用示例
-def demo_advanced_thread_pool():
-    """演示高级线程池的使用"""
-    
-    def compute_square(number: int) -> int:
-        """计算平方"""
-        time.sleep(0.5)  # 模拟计算时间
-        if number == 3:  # 模拟错误
-            raise ValueError("I don't like number 3!")
-        return number * number
-    
-    # 创建线程池
-    pool = ThreadPool(num_workers=2, name="ComputePool")
-    
-    try:
-        # 提交任务
-        task_ids = []
-        for i in range(5):
-            task_id = pool.submit(compute_square, i)
-            task_ids.append(task_id)
-            print(f"Submitted task {task_id} for number {i}")
-        
-        # 获取结果
-        for task_id in task_ids:
+# class ThreadInteruptedException(Exception):
+#     pass
+
+def LoopDaemonThread(func:callable, name:str=None, sleep:float=1, *args, **kwargs)->threading.Thread:
+    obj = {
+        'is_running':True
+    }    
+    @functools.wraps(func)
+    def wrap():
+        while obj['is_running']:
             try:
-                result = pool.get_result(task_id, timeout=10)
-                print(f"Task {task_id} result: {result}")
-            except Exception as e:
-                print(f"Task {task_id} failed: {e}")
+                func(*args, **kwargs)
+            except Exception as e:                
+                _logger.ERROR('Exception Now to exit', e)
+                break
+            Sleep(sleep)
+        _logger.DEBUG('Exit LoopThread')
+    
+    t = newThread(wrap, name=name, daemon=True)    
+    t.start()
+    
+    def on_exit():
+        obj['is_running'] = False
         
-        # 查看线程池状态
-        status = pool.get_pool_status()
-        print("Pool status:", status)
+    atexit.register(on_exit)
+    
+    return t
+    
+def loopThread(name:str=None, sleep:int=1):    
+    def decorator(func:Callable):
+        _name = name
+        if str_isEmpty(_name):
+            _name = get_methodname(func)
+        LoopDaemonThread(func, name=_name, sleep=sleep)
+        @functools.wraps(func)
+        def wrap(*args, **kwargs):
+            return func(*args, **kwargs)
+        return wrap
+    return decorator
+
+# # 使用示例
+# def demo_advanced_thread_pool():
+#     """演示高级线程池的使用"""
+    
+#     def compute_square(number: int) -> int:
+#         """计算平方"""
+#         time.sleep(0.5)  # 模拟计算时间
+#         if number == 3:  # 模拟错误
+#             raise ValueError("I don't like number 3!")
+#         return number * number
+    
+#     # 创建线程池
+#     pool = ThreadPool(num_workers=2, name="ComputePool")
+    
+#     try:
+#         # 提交任务
+#         task_ids = []
+#         for i in range(5):
+#             task_id = pool.submit(compute_square, i)
+#             task_ids.append(task_id)
+#             print(f"Submitted task {task_id} for number {i}")
         
-    finally:
-        pool.shutdown()
+#         # 获取结果
+#         for task_id in task_ids:
+#             try:
+#                 result = pool.get_result(task_id, timeout=10)
+#                 print(f"Task {task_id} result: {result}")
+#             except Exception as e:
+#                 print(f"Task {task_id} failed: {e}")
+        
+#         # 查看线程池状态
+#         status = pool.get_pool_status()
+#         print("Pool status:", status)
+        
+#     finally:
+#         pool.shutdown()
             
 # def threadpool(func:Callable):
 #     @functools.wraps(func)
@@ -256,4 +298,5 @@ def demo_advanced_thread_pool():
 
 
 if __name__ == "__main__":
-    demo_advanced_thread_pool()
+    # demo_advanced_thread_pool()
+    pass

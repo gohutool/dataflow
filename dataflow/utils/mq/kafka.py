@@ -1,36 +1,23 @@
 from confluent_kafka import Producer ,Consumer
 import time
 from dataflow.utils.utils import current_millsecond,json_to_str
-from dataflow.utils.thread import newThread,Sleep
+from dataflow.utils.thread import Sleep,LoopDaemonThread
 from dataflow.utils.reflect import is_user_object
-import atexit
 from dataflow.utils.log import Logger
 
 _logger = Logger('dataflow.utils.mq.kafka')
 
-def getProducer(config:dict)->Producer:
-    obj = {
-        'is_running':True
-    }
+def getProducer(config:dict)->Producer:    
     p = Producer(config)
-    def startProducerFlush():
-        while obj['is_running']:
-            remaining_messages = p.flush(5)
-            if remaining_messages > 0:
-                _logger.WARN(f"⚠️  flush() 超时，仍有 {remaining_messages} 条消息未完成交付")
-            else:
-                _logger.DEBUG("所有消息均已交付。")        
-            Sleep(5)
-            
-    t = newThread(startProducerFlush, name=f'Kafka-produce-{current_millsecond()}', daemon=True)
-    setattr(t, '__end__', obj)
-    t.start()
     
-    def on_exit():
-        obj['is_running'] = False
-        
-    atexit.register(on_exit)
-    
+    def _producerFlush():
+        remaining_messages = p.flush(5)
+        if remaining_messages > 0:
+            _logger.WARN(f"⚠️  flush() 超时，仍有 {remaining_messages} 条消息未完成交付")
+        else:
+            _logger.DEBUG("所有消息均已交付。")
+                
+    LoopDaemonThread(_producerFlush, name=f'Kafka-produce-{current_millsecond()}', sleep=5)        
     return p
 
 def produce(producer:any, topic:str, payload:str|dict|object, cb:callable):
@@ -52,34 +39,42 @@ def getConsumer(config:dict)->any:
     return c
 
 def subscribe(consumer:Consumer, topic:str|list[str], onConsumer:callable):        
-    obj = {
-        'is_running':True
-    }
-    
+    # obj = {
+    #     'is_running':True
+    # }    
     if isinstance(topic, str):
         topic = [topic]
-    consumer.subscribe(topic)
-    
-    def startSubscribe():
-        while obj['is_running']:
-            msg = consumer.poll(1.0)
-            if msg is None: 
-                continue
-            if msg.error():
-                # print('⚠️', msg.error())
-                onConsumer(err=msg.error(), msg=msg)
-                continue
-            onConsumer(err=None, msg=msg)
-            # print('💬', msg.value().decode())
-            
-    t = newThread(startSubscribe, name=f'Kafka-subscribe-{'-'.join(topic)}-{current_millsecond()}', daemon=True)
-    setattr(t, '__end__', obj)
-    t.start()
-    
-    def on_exit():
-        obj['is_running'] = False
         
-    atexit.register(on_exit)
+    consumer.subscribe(topic)    
+    # def startSubscribe():
+    #     while obj['is_running']:
+    #         msg = consumer.poll(1.0)
+    #         if msg is None: 
+    #             continue
+    #         if msg.error():                
+    #             onConsumer(err=msg.error(), msg=msg)
+    #             continue
+    #         onConsumer(err=None, msg=msg)                    
+    # t = newThread(startSubscribe, name=f'Kafka-subscribe-{'-'.join(topic)}-{current_millsecond()}', daemon=True)
+    # setattr(t, '__end__', obj)
+    # t.start()
+    
+    # def on_exit():
+    #     obj['is_running'] = False
+        
+    # atexit.register(on_exit)
+    
+    def _subscribe():
+        msg = consumer.poll(1.0)
+        if msg is None: 
+            return 
+        if msg.error():
+            # print('⚠️', msg.error())
+            onConsumer(err=msg.error(), msg=msg)
+            return
+        onConsumer(err=None, msg=msg)
+            
+    LoopDaemonThread(_subscribe, name=f'Kafka-produce-{current_millsecond()}', sleep=0.001)
 
 def test_producer():
     p = getProducer({
@@ -100,21 +95,18 @@ def test_producer():
             print('✅', msg.topic(), msg.partition(), msg.offset())
 
     def send():
-        while True:
-            for i in range(10):
-                print(f'==={i+1}')
-                payload = {'id': i, 
-                           'ts': time.time(),
-                           'no': current_millsecond()
-                }
-                
-                produce(p, 'python.test', payload, cb)    
-                # p.produce('python.test', payload, callback=cb)
-                # print(p.poll(0))          # 触发回调
-                Sleep(1)
+        for i in range(10):
+            print(f'==={i+1}')
+            payload = {'id': i, 
+                        'ts': time.time(),
+                        'no': current_millsecond()
+            }
             
-    t = newThread(send, daemon=True)    
-    t.start()
+            produce(p, 'python.test', payload, cb)    
+            # p.produce('python.test', payload, callback=cb)
+            # print(p.poll(0))          # 触发回调
+            Sleep(1)
+    LoopDaemonThread(send, sleep=0.001)
 
 def test_consumer():
     c = getConsumer({
@@ -172,7 +164,7 @@ def test_consumer():
 if __name__ == "__main__":
     print('start')
     
-    # test_consumer()
+    test_consumer()
     test_producer()
         
     input('输入任何字符退出')
