@@ -25,10 +25,10 @@ def getCurrentThreadName()->str:
 def getCurrentThreadId()->int:
     return getCurrentThread().ident
 
-def newThread(func:callable, name:str, daemon:bool=None, *args, **kwargs)->threading.Thread:
-    threading.Thread(target=func, name=name, *args, **kwargs, daemon=daemon)
+def newThread(func:callable, name:str=None, daemon:bool=None, *args, **kwargs)->threading.Thread:
+    t = threading.Thread(target=func, name=name, *args, **kwargs, daemon=daemon)
+    return t
     
-
 class TaskStatus(Enum):
     PENDING = "pending"
     RUNNING = "running"
