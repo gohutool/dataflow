@@ -19,25 +19,6 @@ handlers:
     backupCount: 5
     encoding: utf-8
 loggers:
-  apscheduler:
-    level: WARN
-    handlers: [console, file]
-  main:
-    level: INFO
-    handlers: [console, file]
-    propagate: False
-  utils:
-    level: INFO
-    handlers: [console, file]
-    propagate: False
-  strategy:
-    level: INFO
-    handlers: [console, file]
-    propagate: False
-  dao:
-    level: DEBUG
-    handlers: [console, file]
-    propagate: False
   dataflow.utils.dbtools:
     level: DEBUG
     handlers: [console, file]
@@ -59,10 +40,6 @@ loggers:
     handlers: [console, file]
     propagate: False
   uvicorn:
-    level: INFO
-    handlers: [console, file]
-    propagate: False
-  Downloader:
     level: INFO
     handlers: [console, file]
     propagate: False

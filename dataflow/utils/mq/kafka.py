@@ -7,17 +7,22 @@ from dataflow.utils.log import Logger
 
 _logger = Logger('dataflow.utils.mq.kafka')
 
+# https://github.com/confluentinc/librdkafka/blob/master/CONFIGURATION.md
+
 def getProducer(config:dict)->Producer:    
     p = Producer(config)
     
     def _producerFlush():
-        remaining_messages = p.flush(5)
-        if remaining_messages > 0:
-            _logger.WARN(f"⚠️  flush() 超时，仍有 {remaining_messages} 条消息未完成交付")
-        else:
-            _logger.DEBUG("所有消息均已交付。")
+        try:
+            remaining_messages = p.flush(5)
+            if remaining_messages > 0:
+                _logger.WARN(f"⚠️  flush() 超时，仍有 {remaining_messages} 条消息未完成交付")
+            else:
+                _logger.DEBUG("所有消息均已交付。")
+        except Exception as e:
+            _logger.WARN(f'通道发生错误-{e}')
                 
-    LoopDaemonThread(_producerFlush, name=f'Kafka-produce-{current_millsecond()}', sleep=5)        
+    LoopDaemonThread(_producerFlush, name=f'Kafka-produce-{config['client.id']}-{current_millsecond()}', sleep=5)        
     return p
 
 def produce(producer:any, topic:str, payload:str|dict|object, cb:callable):
@@ -64,17 +69,22 @@ def subscribe(consumer:Consumer, topic:str|list[str], onConsumer:callable):
         
     # atexit.register(on_exit)
     
-    def _subscribe():
+    def _subscribe():                
         msg = consumer.poll(1.0)
         if msg is None: 
             return 
         if msg.error():
-            # print('⚠️', msg.error())
-            onConsumer(err=msg.error(), msg=msg)
+            # print('⚠️', msg.error())            
+            onConsumer(err=msg.error(), msg=msg)            
             return
-        onConsumer(err=None, msg=msg)
+        try:
+            onConsumer(err=None, msg=msg)
+        except Exception as e:
+            _logger.WARN(f'消息订阅发生错误-{e}')
+            # if consumer.
+            # pass
             
-    LoopDaemonThread(_subscribe, name=f'Kafka-produce-{current_millsecond()}', sleep=0.001)
+    LoopDaemonThread(_subscribe, name=f'Kafka-consumer-{current_millsecond()}', sleep=0.001)
 
 def test_producer():
     p = getProducer({
@@ -114,6 +124,9 @@ def test_consumer():
         'group.id': 'python-demo',
         'auto.offset.reset': 'earliest'
     })
+    
+    # print(f'consumer={dir(c)} ')
+    print(f'consumer={c.list_topics().topics} ')
     
     def on_consumer(err, msg):
         if err:

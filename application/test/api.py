@@ -1,4 +1,4 @@
-from dataflow.utils.utils import ReponseVO, date_datetime_cn
+from dataflow.utils.utils import ReponseVO, date_datetime_cn, date2str_yyyymmddhhmmsss
 
 from dataflow.module import Context,WebContext
 from dataflow.utils.log import Logger
@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request, status, HTTPException # noqa: F401
 from fastapi.responses import JSONResponse
 from dataflow.module.context.web import limiter
 from dataflow.module.context.redis import RedisContext
+from dataflow.module.context.kafka import KafkaContext
 
 from application.test.service import ItemService, getInfos, UerService
 
@@ -97,4 +98,35 @@ async def test_get_request():
     request = WebContext.getRequest()
     return ReponseVO(data={"base_url":request.base_url, 
                            'method': request.method})
-        
+
+def on_callback(err, msg):
+    _logger.DEBUG(f'====={msg}')
+    if err:
+        _logger.DEBUG(f'❌ {err}')
+    else:
+        _logger.DEBUG(f'✅ {msg.topic()} {msg.partition()} {msg.offset()}')
+
+
+@app.get("/test/kafka1")
+async def test_kafka_1(request:Request, itemid:str=None):
+    _logger.INFO('测试Kafka1组件')
+    KafkaContext.getOutBoud('server-1').send('input_others', {
+        "time": date_datetime_cn(),
+        "time_str": date2str_yyyymmddhhmmsss(date_datetime_cn()),
+        'itemid':itemid,
+        "inbound":"server-1",
+        "subscribe": "python.test.1"
+    }, on_callback)
+    return ReponseVO(data=Context.Value('${env:LANGFUSE.secret_key:1-sk-lf-b60f4b33-ff5a-46ac-9086-e776373c86da}'))
+
+@app.get("/test/kafka2")
+async def test_kafka_2(request:Request, itemid:str=None):
+    _logger.INFO('测试Kafka2组件')
+    KafkaContext.getOutBoud('server-2').send('input_cardata', {
+        "time": date_datetime_cn(),
+        "time_str": date2str_yyyymmddhhmmsss(date_datetime_cn()),
+        'itemid':itemid,
+        "inbound":"server-2",
+        "subscribe": "python.demo.2"
+    }, on_callback)
+    return ReponseVO(data=Context.Value('${env:LANGFUSE.secret_key:1-sk-lf-b60f4b33-ff5a-46ac-9086-e776373c86da}'))

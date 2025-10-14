@@ -5,7 +5,7 @@ from dataflow.module.context.web import filter
 from dataflow.utils.schedule import ScheduleContext
 from dataflow.utils.log import Logger
 from dataflow.module import Context, WebContext
-
+from dataflow.module.context.kafka import KafkaContext
 
 _logger = Logger('application.test.config')
 
@@ -69,3 +69,20 @@ def print_web_start_test(app):
 @WebContext.Event.on_loaded
 def print_web_load_test(app):
     _logger.DEBUG(f'@WebContext.Event.on_loaded ======================= {app}')            
+
+@KafkaContext.ON_Consumer(inbound='server-1', subscribe='input_others')
+def on_consumer_1(err, msg):
+    if err:
+        _logger.DEBUG(f'================ ⚠️ {err}')
+    else:
+        _logger.DEBUG(f'================ 💬 {msg.value().decode()}')
+    
+
+@KafkaContext.ON_Consumer(inbound='server-2', subscribe='input_cardata')
+def on_consumer_2(err, msg):
+    if err:
+        _logger.DEBUG(f'================ ⚠️ {err}')
+    else:
+        _logger.DEBUG(f'================ 💬 {msg.value().decode()}')
+        
+    

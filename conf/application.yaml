@@ -66,10 +66,60 @@ context:
       allow_header: '*'
       allow_credentials: yes
   stream:
-    kafka:
-      bootstrap-servers: 192.168.18.145:9092
-      producer:        
-      consumer:
+    kafka:      
+      outbound:
+        server-1:
+          bootstrap-servers: 192.168.18.145:9092  
+          client-id: python-producer
+          retries: 5
+          acks: all
+          channels: 
+            input_others:
+              destination: python.test.1
+              content-type: application/json
+            input_cardata:
+              destination: python.test.2      
+              content-type: application/json  
+        server-2:
+          bootstrap-servers: 192.168.18.145:9092  
+          client-id: python-producer
+          retries: 5
+          acks: all
+          channels: 
+            input_others:
+              destination: python.demo.1
+            input_cardata:
+              destination: python.demo.2
+
+      inbound:
+        server-1:
+          bootstrap-servers: 192.168.18.145:9092  
+          group-id: python-consumer
+          auto-offset-reset: earliest          
+          # enable-auto-commit: false
+          # isolation.level: read_committed
+        # 'enable.auto.commit',
+        # 'group.id', 
+        # 'bootstrap.servers',
+        # 'auto.offset.reset',
+        # 'session.timeout.ms',
+        # 'max.poll.interval.ms',
+        # 'auto.commit.interval.ms'
+          subscribes: 
+            input_others:
+              destination: python.test.1
+            input_cardata:
+              destination: python.test.2
+        server-2:
+          bootstrap-servers: 192.168.18.145:9092  
+          group-id: python-consumer
+          auto-offset-reset: earliest       
+          # auto-offset-commit: false   
+          subscribes: 
+            input_others:
+              destination: python.demo.1
+            input_cardata:
+              destination: python.demo.2
   test:
     web:
       title: DataFlow
