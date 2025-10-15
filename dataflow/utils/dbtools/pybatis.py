@@ -604,7 +604,7 @@ if __name__ == "__main__":
     url = 'mysql+pymysql://u:p@localhost:61306/dataflow_test?charset=utf8mb4'
     p = PydbcTools(url=url, username='stock_agent', password='1qaz2wsx', test='select 1')    
 
-    @Mapper(p, namespace='application.user.mapper.UserMapper',table='sys_user',id_col='user_id')
+    @Mapper(p, namespace='application.user.dao.UserMapper',table='sys_user',id_col='user_id')
     class TestMapper:    
         def __init__(self, name:str='LiuYong'):
             self.name = name

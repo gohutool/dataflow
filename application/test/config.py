@@ -33,56 +33,56 @@ async def costtime_handler(request: Request, call_next):
     _logger.INFO(f"测试过滤器==[{request.url}][{ip}] {response.status_code} {cost:.2f}ms")
     return response    
 
-@ScheduleContext.Event.on_Listener(event=ScheduleContext.Event.EVENT_ALL)
-def _print_schedule_event(je:ScheduleContext.Event.JobEvent):
-    _logger.DEBUG(f'触发Scheduler事件{je.code}={je}')
+# @ScheduleContext.Event.on_Listener(event=ScheduleContext.Event.EVENT_ALL)
+# def _print_schedule_event(je:ScheduleContext.Event.JobEvent):
+#     _logger.DEBUG(f'触发Scheduler事件{je.code}={je}')
     
-@ScheduleContext.on_Trigger(trigger=ScheduleContext.Event.CronTrigger(second='*/10'), args=[1,2,3], id='JOB_2')
-@ScheduleContext.on_Trigger(trigger=ScheduleContext.Event.CronTrigger(second='*/30'), kwargs={'a':123}, id='JOB_1')
-def _print_date_info(*args, **kwargs):
-    _logger.DEBUG(f'当前时间==={date2str_yyyymmddhhmmsss(date_datetime_cn())} {args} {kwargs}')
-    
-
-@Context.Event.on_exit
-def print_exit_test():
-    _logger.DEBUG('@Context.Event.on_exit======================= 退出程序')
+# @ScheduleContext.on_Trigger(trigger=ScheduleContext.Event.CronTrigger(second='*/10'), args=[1,2,3], id='JOB_2')
+# @ScheduleContext.on_Trigger(trigger=ScheduleContext.Event.CronTrigger(second='*/30'), kwargs={'a':123}, id='JOB_1')
+# def _print_date_info(*args, **kwargs):
+#     _logger.DEBUG(f'当前时间==={date2str_yyyymmddhhmmsss(date_datetime_cn())} {args} {kwargs}')
     
 
-@Context.Event.on_started
-def print_start_test(context):
-    _logger.DEBUG(f'@Context.Event.on_start======================= 启动程序 {context} ')
+# @Context.Event.on_exit
+# def print_exit_test():
+#     _logger.DEBUG('@Context.Event.on_exit======================= 退出程序')
     
 
-@Context.Event.on_init
-def print_init_test(context, modules):
-    _logger.DEBUG(f'@Context.Event.on_init=======================  {context} {modules}')        
+# @Context.Event.on_started
+# def print_start_test(context):
+#     _logger.DEBUG(f'@Context.Event.on_start======================= 启动程序 {context} ')
     
-@Context.Event.on_loaded
-def print_load_test(context, modules):
-    _logger.DEBUG(f'@Context.Event.on_loaded ======================= {context} {modules}')        
+
+# @Context.Event.on_init
+# def print_init_test(context, modules):
+#     _logger.DEBUG(f'@Context.Event.on_init=======================  {context} {modules}')        
+    
+# @Context.Event.on_loaded
+# def print_load_test(context, modules):
+#     _logger.DEBUG(f'@Context.Event.on_loaded ======================= {context} {modules}')        
         
 
-@WebContext.Event.on_started
-def print_web_start_test(app):
-    _logger.DEBUG('@WebContext.Event.on_start======================= 启动程序')
+# @WebContext.Event.on_started
+# def print_web_start_test(app):
+#     _logger.DEBUG('@WebContext.Event.on_start======================= 启动程序')
     
-@WebContext.Event.on_loaded
-def print_web_load_test(app):
-    _logger.DEBUG(f'@WebContext.Event.on_loaded ======================= {app}')            
+# @WebContext.Event.on_loaded
+# def print_web_load_test(app):
+#     _logger.DEBUG(f'@WebContext.Event.on_loaded ======================= {app}')            
 
-@KafkaContext.ON_Consumer(inbound='server-1', subscribe='input_others')
-def on_consumer_1(err, msg):
-    if err:
-        _logger.DEBUG(f'================ ⚠️ {err}')
-    else:
-        _logger.DEBUG(f'================ 💬 {msg.value().decode()}')
+# @KafkaContext.ON_Consumer(inbound='server-1', subscribe='input_others')
+# def on_consumer_1(err, msg):
+#     if err:
+#         _logger.DEBUG(f'================ ⚠️ {err}')
+#     else:
+#         _logger.DEBUG(f'================ 💬 {msg.value().decode()}')
     
 
-@KafkaContext.ON_Consumer(inbound='server-2', subscribe='input_cardata')
-def on_consumer_2(err, msg):
-    if err:
-        _logger.DEBUG(f'================ ⚠️ {err}')
-    else:
-        _logger.DEBUG(f'================ 💬 {msg.value().decode()}')
+# @KafkaContext.ON_Consumer(inbound='server-2', subscribe='input_cardata')
+# def on_consumer_2(err, msg):
+#     if err:
+#         _logger.DEBUG(f'================ ⚠️ {err}')
+#     else:
+#         _logger.DEBUG(f'================ 💬 {msg.value().decode()}')
         
     

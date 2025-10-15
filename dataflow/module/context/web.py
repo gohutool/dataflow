@@ -2,12 +2,12 @@
 from typing import Callable
 from starlette.middleware.base import BaseHTTPMiddleware
 from dataflow.utils.log import Logger
-from dataflow.utils.utils import str_isEmpty,str_strip, ReponseVO, get_list_from_dict, get_bool_from_dict,current_millsecond
+from dataflow.utils.utils import str_isEmpty,str_strip, ReponseVO, get_list_from_dict, get_bool_from_dict,current_millsecond,r_str
 from dataflow.utils.web.asgi import get_remote_address, CustomJSONResponse,get_ipaddr
 from dataflow.utils.reflect import get_methodname
 from dataflow.module import Context, WebContext
 from antpathmatcher import AntPathMatcher
-from fastapi import Request, FastAPI
+from fastapi import Request, FastAPI, APIRouter
 from slowapi import Limiter
 import functools
 # from fastapi.responses import JSONResponse
@@ -15,6 +15,7 @@ from fastapi.exceptions import RequestValidationError,HTTPException
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uuid
+from dataflow.utils.jwt import create_token as _create_token, verify_token as _verify_token
 
 _logger = Logger('dataflow.module.context.web')
 
@@ -28,6 +29,66 @@ antmatcher = AntPathMatcher()
 # "/users/{user_id}/posts/{post_id}", "/users/123/posts/456"
 # )
 # print(variables) # 输出: {'user_id': '123', 'post_id': '456'}
+
+class RequestBind:
+    @staticmethod
+    def GetMapping(api:FastAPI|APIRouter, *args, **kwargs):
+        if isinstance(api, FastAPI):
+            api:FastAPI = api
+            return api.get(*args, **kwargs)
+        else:            
+            api:APIRouter = api
+            return api.get(*args, **kwargs)
+            
+    @staticmethod
+    def PostMapping(api:FastAPI|APIRouter, *args, **kwargs):
+        if isinstance(api, FastAPI):
+            api:FastAPI = api
+            return api.post(*args, **kwargs)
+        else:            
+            api:APIRouter = api
+            return api.post(*args, **kwargs)
+        
+    @staticmethod
+    def PutMapping(api:FastAPI|APIRouter, *args, **kwargs):
+        if isinstance(api, FastAPI):
+            api:FastAPI = api
+            return api.put(*args, **kwargs)
+        else:            
+            api:APIRouter = api
+            return api.put(*args, **kwargs)
+        
+    @staticmethod
+    def DeleteMapping(api:FastAPI|APIRouter, *args, **kwargs):
+        if isinstance(api, FastAPI):
+            api:FastAPI = api
+            return api.delete(*args, **kwargs)
+        else:            
+            api:APIRouter = api
+            return api.delete(*args, **kwargs)
+        
+    @staticmethod
+    def OptionsMapping(api:FastAPI|APIRouter, *args, **kwargs):
+        if isinstance(api, FastAPI):
+            api:FastAPI = api
+            return api.options(*args, **kwargs)
+        else:            
+            api:APIRouter = api
+            return api.options(*args, **kwargs)
+        
+    @staticmethod
+    def RequestMapping(api:FastAPI|APIRouter, *args, **kwargs):
+        if not kwargs:
+            kwargs = {}
+        kwargs['methods']=['GET','POST','PUT','DELETE']
+        
+        if isinstance(api, FastAPI):
+            api:FastAPI = api            
+            return api.api_route(*args, **kwargs)
+        else:            
+            api:APIRouter = api
+            return api.api_route(*args, **kwargs)
+
 _filter = []
 
 def filter(app:FastAPI=None, *, path:list[str]|str='*', excludes:list[str]|str=None, order=1):       
@@ -145,6 +206,17 @@ def limiter(rule:str, *, key:Callable|str=None):
 @WebContext.Event.on_loaded
 def init_error_handler(app:FastAPI):
     
+    # 覆盖校验错误
+    @app.exception_handler(Context.ContextExceptoin)
+    async def context_exception_handler(request: Request, exc:Context.ContextExceptoin):        
+        # _logger.ERROR(f'处理RequestValidationError: {exc}', exc)
+        _logger.WARN(f'处理Expcetion: {exc}')
+        return CustomJSONResponse(
+            status_code=exc.status_code,
+            # content={"code": 422, "message": "参数校验失败", "errors": exc.errors()}
+            content=ReponseVO(False, code=exc.code, msg=exc.detail, data=exc.detail)
+        )    
+        
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc:HTTPException):
         # _logger.ERROR(f'处理HttpExpcetion: {exc}', exc)
@@ -154,7 +226,7 @@ def init_error_handler(app:FastAPI):
             # content={"code": exc.status_code, "message": exc.detail}
             content=ReponseVO(False, code=exc.status_code, msg=exc.detail, data=exc.detail)
         )
-        
+    
     
     @app.exception_handler(Exception)
     async def exception_handler(request: Request, exc:Exception):
@@ -184,10 +256,21 @@ def init_error_handler(app:FastAPI):
         # _logger.ERROR(f'处理RequestValidationError: {exc}', exc)
         _logger.WARN(f'处理Expcetion: {exc}')
         return CustomJSONResponse(
-            status_code=422,
+            status_code=200,
             # content={"code": 422, "message": "参数校验失败", "errors": exc.errors()}
             content=ReponseVO(False, code=422, msg=exc.detail, data=exc.errors)
         )
+
+_ttl_minutes = Context.Value('{context.jwt.ttl_minutes|21600}')
+_secret = r_str(Context.Value('{context.jwt.secret|replace-with-256-bit-secret}'), 32)
+
+_logger.DEBUG(f'JWT参数 ttl_minutes={_ttl_minutes} secret={_secret}')
+
+def create_token(user_key: str, user_name:str)->str:
+    return _create_token(user_key, user_name, _ttl_minutes, _secret)
+
+def verify_token(token:str)->dict:
+    return _verify_token(token, _secret)
 
 @WebContext.Event.on_started
 def _register_all_filter(_app:FastAPI):
@@ -251,6 +334,8 @@ def init_web_common_filter(app:FastAPI):
             rid = request.state.xid
         try:                        
             response = await call_next(request)
+        except Context.ContextExceptoin as e:
+            raise e
         except HTTPException as e:
             raise e
         except RequestValidationError as e:
@@ -259,7 +344,7 @@ def init_web_common_filter(app:FastAPI):
             raise e
         except Exception as e:
             # _logger.ERROR(f"[{rid}] {request.method} {request.url}", e)
-            raise Context.ContextExceptoin(detail=e.__str__()) from e
+            raise Context.ContextExceptoin(detail=str(e)) from e
         
         _logger.INFO(f"[{rid}] {request.method} {request.url}")        
         return response    

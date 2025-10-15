@@ -17,7 +17,7 @@ _logger.INFO('实例化用户模块')
 def create_item(title: str):
     return {"id": 42, "title": title}
 
-@router.get("/{item_id}")
+@router.post("/{item_id}")
 @LangfuseContext.observe
 def read_item(item_id: str):    
     key = f'cache:data:user:{item_id}'

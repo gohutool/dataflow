@@ -16,8 +16,11 @@ class AppReponseVO:
             "msg": self.msg,            
             "code": self.code,
         }
-        if self.data:
+        if isinstance(self.data,dict) :
             rtn.update(self.data)
+        else:
+            rtn['data'] = self.data
+            
         return rtn
         
     def __repr__(self):

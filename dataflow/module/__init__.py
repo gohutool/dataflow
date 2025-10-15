@@ -49,7 +49,8 @@ class Context:
                     HTTP status code to send to the client.
                     """
                 ),
-            ]=503,
+            ]=200,
+            code=500,
             headers: Annotated[
                 Optional[Dict[str, str]],
                 Doc(
@@ -60,6 +61,7 @@ class Context:
             ] = None,
         ) -> None:
             super().__init__(status_code=status_code, detail=detail, headers=headers)
+            self.code = code
         
     SERVICE_PREFIX :str = 'context.service'
     class Event:
@@ -155,6 +157,11 @@ class Context:
         _logger.INFO(f'注册服务{service_name}={service}') 
     
     def getBean(self, service_name):
+        if isinstance(service_name, str):
+            service_name = service_name
+        else:
+            service_name = get_fullname(service_name)
+        
         k = Context.SERVICE_PREFIX + '.' + service_name
         if k in self._CONTEXT:
             return self._CONTEXT[k]

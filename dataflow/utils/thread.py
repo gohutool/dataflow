@@ -299,4 +299,5 @@ def loopThread(name:str=None, sleep:int=1):
 
 if __name__ == "__main__":
     # demo_advanced_thread_pool()
+    pool = ThreadPool(num_workers=2, name="ComputePool")
     pass

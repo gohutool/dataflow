@@ -3,12 +3,16 @@ from dataflow.module import WebContext,Context
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import UUID
 from dataflow.module.context.redis import RedisContext
+from dataflow.module.context.web import RequestBind
+
 from captcha.image import ImageCaptcha
 import random
 import string
 
 from dataflow.utils.sign import b64_encode
 from application import AppReponseVO
+from application.user.service import UserService
+from dataflow.utils.sign import matches
 
 _logger = Logger('application.auth')
 
@@ -23,7 +27,8 @@ def _generate_code(length: int = 4) -> str:
 
 _CAPTCHA_CODE_CACHE_KEY = 'app:captcha:code:'
 
-@router.get('/captchaImage')
+# @router.get('/captchaImage')
+@RequestBind.GetMapping(router, '/captchaImage')
 def captchaImage():
     code = _generate_code(4)
     captcha_id = UUID().hex
@@ -43,7 +48,8 @@ def captchaImage():
     }).dict()
     
 
-@router.get('/login')    
+# @router.post('/login')    
+@RequestBind.RequestMapping(router, '/login')
 def login(payload: dict = Body(...)):
     username = payload['username']
     password = payload['password']
@@ -57,10 +63,17 @@ def login(payload: dict = Body(...)):
     if not _code:
         raise Context.ContextExceptoin('验证码已经失效')
     
-    if code == _code:
+    if not code.lower() == _code.lower():
         raise Context.ContextExceptoin('验证码输入错误')
     
+    userService:UserService = Context.getContext().getBean(UserService)
+    user = userService.loadUserByUsername(username)
     
-    pass
+    if not matches(password, user['password']):
+        raise Context.ContextExceptoin('用户名和密码错误')
+    
+    return AppReponseVO(data=user).dict()
+
+
 
 WebContext.getRoot().include_router(router)

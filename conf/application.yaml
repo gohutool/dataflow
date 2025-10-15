@@ -29,6 +29,9 @@ context:
     default_limit_rate:
       - 200000/day
       - 50/hour
+  pybatisplus:
+    root: conf
+    pattern: /**/*Mapper.xml
   database:
     ds01:
       url: ${env:MYSQLDS.url:mysql+pymysql://u:p@localhost:61306/dataflow_test?charset%20utf8mb4}
@@ -68,7 +71,10 @@ context:
       allow_methods: '*'
       allow_header: '*'
       allow_credentials: yes
-  stream:
+    jwt:
+      ttl_minutes: 21600
+      secret: 'replace-with-256-bit-secret'      # 32 字节以上
+  stream1:
     kafka:      
       outbound:
         server-1:
