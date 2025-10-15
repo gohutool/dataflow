@@ -50,6 +50,8 @@ def login(payload: dict = Body(...)):
     code = payload['code']
     uuid = payload['uuid']
     
+    _logger.DEBUG(f'usernmae={username} password={password} code={code}, uuid={uuid}')
+    
     _code = RedisContext.getTool().get(_CAPTCHA_CODE_CACHE_KEY+':'+uuid)
     
     if not _code:

@@ -14,54 +14,49 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
 from dataflow.utils.log import Logger
-from dataflow.module import WebContext
+from dataflow.utils.utils import get_bool_from_dict
+from dataflow.utils.reflect import get_fullname
+from dataflow.module import WebContext, Context
 
 _logger = Logger('dataflow.module.context.metrics')
 
-# Request metrics
-http_requests_total = Counter("http_requests_total", "Total number of HTTP requests", ["method", "endpoint", "status"])
-
-http_request_duration_seconds = Histogram(
-    "http_request_duration_seconds", "HTTP request duration in seconds", ["method", "endpoint"]
-)
-
-# # Database metrics
-# __db_connections = Gauge("db_connections", "Number of active database connections")
-
-# # Custom business metrics
-# __orders_processed = Counter("orders_processed_total", "Total number of orders processed")
-
-__llm_process_duration_seconds = Histogram(
-    "llm_process_duration_seconds",
-    "Time spent processing LLM",
-    ["model", "label"],
-    buckets=[0.1, 0.3, 0.5, 1.0, 2.0, 5.0, 60]    
-)
-
-__llm_inference_duration_seconds = Histogram(
-    "llm_inference_duration_seconds",
-    "Time spent processing LLM inference",
-    ["model"],
-    buckets=[0.1, 0.3, 0.5, 1.0, 2.0, 5.0, 60]    
-)
-
-__llm_stream_duration_seconds = Histogram(
-    "llm_stream_duration_seconds",
-    "Time spent processing LLM stream inference",
-    ["model"],
-    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 60]
-)
-
-def llm_duration_stream_metrics(model:str, duration:float)->None:
-    __llm_stream_duration_seconds.labels(model=model).observe(duration)
-
-def llm_duration_inference_metrics(model:str, duration:float)->None:
-    __llm_inference_duration_seconds.labels(model=model).observe(duration)
-
-def llm_duration_metrics(model:str, label:str, duration:float)->None:
-    __llm_process_duration_seconds.labels(model=model, label=label).observe(duration)
+class MetricsContext:
+    def __init__(self):        
+        # Request metrics
+        self.__llm_process_duration_seconds = Histogram(
+            "llm_process_duration_seconds",
+            "Time spent processing LLM",
+            ["model", "label"],
+            buckets=[0.1, 0.3, 0.5, 1.0, 2.0, 5.0, 60]    
+        )
+        self.__llm_inference_duration_seconds = Histogram(
+            "llm_inference_duration_seconds",
+            "Time spent processing LLM inference",
+            ["model"],
+            buckets=[0.1, 0.3, 0.5, 1.0, 2.0, 5.0, 60]    
+        )
+        self.__llm_stream_duration_seconds = Histogram(
+            "llm_stream_duration_seconds",
+            "Time spent processing LLM stream inference",
+            ["model"],
+            buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 60]
+        )        
+        # # Database metrics
+        # __db_connections = Gauge("db_connections", "Number of active database connections")
+        # # Custom business metrics
+        # __orders_processed = Counter("orders_processed_total", "Total number of orders processed")
     
     
+    def llm_duration_stream_metrics(self, model:str, duration:float)->None:
+        self.__llm_stream_duration_seconds.labels(model=model).observe(duration)
+
+    def llm_duration_inference_metrics(self, model:str, duration:float)->None:
+        self.__llm_inference_duration_seconds.labels(model=model).observe(duration)
+
+    def llm_duration_metrics(self, model:str, label:str, duration:float)->None:
+        self.__llm_process_duration_seconds.labels(model=model, label=label).observe(duration)
+
+
 def setup_metrics(app):
     """Set up Prometheus metrics middleware and endpoints.
 
@@ -78,12 +73,18 @@ def setup_metrics(app):
     app.add_route("/prometheus/metrics", metrics)
     _logger.INFO('Metrics组件加载成功')
     
+    metricsContext = MetricsContext()
+    Context.getContext().registerBean(get_fullname(metricsContext), metricsContext)
     
     
 class MetricsMiddleware(BaseHTTPMiddleware):
     """Middleware for tracking HTTP request metrics."""
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)                        
+        super().__init__(*args, **kwargs)                   
+        self.http_requests_total = Counter("http_requests_total", "Total number of HTTP requests", ["method", "endpoint", "status"])
+        self.http_request_duration_seconds = Histogram(
+            "http_request_duration_seconds", "HTTP request duration in seconds", ["method", "endpoint"]
+        )                             
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Track metrics for each request.
@@ -106,12 +107,18 @@ class MetricsMiddleware(BaseHTTPMiddleware):
         finally:
             duration = time.time() - start_time
             # Record metrics
-            http_requests_total.labels(method=request.method, endpoint=request.url.path, status=status_code).inc()
-            http_request_duration_seconds.labels(method=request.method, endpoint=request.url.path).observe(duration)
-            _logger.DEBUG(f'http_requests_total={http_requests_total.labels}')
-
+            self.http_requests_total.labels(method=request.method, endpoint=request.url.path, status=status_code).inc()
+            self.http_request_duration_seconds.labels(method=request.method, endpoint=request.url.path).observe(duration)
+            _logger.DEBUG(f'http_requests_total={self.http_requests_total.labels}')
         return response
 
+prefix = 'context.metrics.prometheus'
 
-setup_metrics(WebContext.getRoot())
+@Context.Configurationable(prefix=prefix)
+def _init_metrics_context(config:dict):
+    if config and get_bool_from_dict(config, 'enable'):
+        setup_metrics(WebContext.getRoot())
+        _logger.DEBUG(f'初始化Metreics上下文={config}')
+    else:
+        _logger.DEBUG(f'没有启动Metreics上下文，设置{prefix}.enable: True启动')
 

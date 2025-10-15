@@ -141,6 +141,9 @@ class Context:
         return self._application_config            
     
     def registerBean(self, service_name, service, override:bool=True):
+        if str_isEmpty(service_name):
+            service_name = get_fullname(service)
+            
         if not override:
             if Context.SERVICE_PREFIX + '.' + service_name in self._CONTEXT:
                 raise Exception(f'{service}已经存在，注册组件时可以设置override=True进行覆盖')

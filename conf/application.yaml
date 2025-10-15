@@ -22,6 +22,9 @@ features:
   api_url: "https://api.${server.host}:${server.port}/v1"
 
 context:
+  metrics:
+    prometheus:
+      enable: on
   limiter:
     default_limit_rate:
       - 200000/day
