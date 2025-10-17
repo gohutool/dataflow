@@ -1,6 +1,8 @@
 application:
   name: DataFlow Application
   version: 1.0.1-beta
+  profiles:
+    active: dev
   server:
     port: ${env:SERVER_PORT:8080}
     host: ${env:SERVER_HOST:0.0.0.0}

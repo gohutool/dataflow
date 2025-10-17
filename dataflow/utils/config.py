@@ -352,18 +352,25 @@ class YamlConfigation:
         
     def mergeDict(self, config:dict={}):        
         if config:
-            update_config = OmegaConf.from_dotlist([f"{k}={v}" for k, v in config.items()])
-            merged = OmegaConf.merge(self._c, update_config)
-            self._c = merged
-            self._config = OmegaConf.to_container(self._c, resolve=True)
-            self._config_temp = OmegaConf.create(self._config)
-            # self._config.update(merged)
-            return merged
+            dotlist = [f"{k}={v}" for k, v in config.items()]
+            return self.mergeDotlist(dotlist)
+            # update_config = OmegaConf.from_dotlist()
+            # merged = OmegaConf.merge(self._c, update_config)
+            # self._c = merged
+            # self._config = OmegaConf.to_container(self._c, resolve=True)
+            # self._config_temp = OmegaConf.create(self._config)
+            # # self._config.update(merged)
+            # return merged
         return {}
     
     def mergeDotlist(self, dotlist:list=[]):        
         if dotlist:
-            update_config = OmegaConf.from_dotlist(dotlist)
+            
+            converted_texts = []
+            for v in dotlist:
+                converted_texts.append(convert_yaml_config_txt(v))
+            
+            update_config = OmegaConf.from_dotlist(converted_texts)
             merged = OmegaConf.merge(self._c, update_config)
             self._c = merged
             self._config = OmegaConf.to_container(self._c, resolve=True)
@@ -505,7 +512,7 @@ if __name__ == "__main__":
     s = '${env:LANGFUSE.secret_key:1-sk-lf-b60f4b33-ff5a-46ac-9086-e776373c86da}'
     print(f'{s} = {config.value(s)}')
     
-    dict = {'application.server.port': 9090, 'application.server.host':'192.168.0.1'}
+    dict = {'application.server.port': '${aaa.test:19999}', 'application.server.host':'192.168.1.1'}
     
     config.mergeFile('conf/application-dev.yaml')
     
@@ -515,7 +522,7 @@ if __name__ == "__main__":
     print(config.getConfig('application.server.port'))
     print(config.getConfig('context.test'))
     
-    dotlist = ['application.server.port=9091', 'application.server.host=192.168.0.2']
+    dotlist = ['application.server.port=${aaa.test:9999}', 'application.server.host=192.168.0.2']
     config.mergeDotlist(dotlist)
     print(config.getConfig('application.server'))
     

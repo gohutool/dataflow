@@ -48,7 +48,7 @@ class ApplicationBoot:
         ApplicationBoot.application_yaml = application_yaml
         ApplicationBoot.scan = scan
         
-        _c:YamlConfigation = ApplicationBoot.prepareApplicationConfig(application_yaml, configuration)
+        _c:YamlConfigation = ApplicationBoot._prepareApplicationConfig(application_yaml, configuration)
         
         ApplicationBoot.applicationConfig = _c
         
@@ -74,7 +74,7 @@ class ApplicationBoot:
         _logger.INFO(f"{_c.getStr('application.name', 'DataFlow Application')} {_c.getStr('application.version', '1.0.0')} End server on {host}:{port}")        
         
     @staticmethod
-    def prepareApplicationConfig(application_yaml:str='conf/application.yaml', configuration:dict={})->YamlConfigation:
+    def _prepareApplicationConfig(application_yaml:str='conf/application.yaml', configuration:dict={})->YamlConfigation:
         _c:YamlConfigation = YamlConfigation.loadConfiguration(application_yaml)
         _c.mergeDict(configuration)
         return _c
