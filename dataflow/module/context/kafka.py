@@ -5,6 +5,7 @@ from dataflow.utils.mq.kafka import getProducer, getConsumer,produce, subscribe 
 from confluent_kafka import Producer, Consumer
 import functools
 
+
 prefix = 'context.stream.kafka'
 
 

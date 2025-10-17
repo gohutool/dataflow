@@ -268,7 +268,20 @@ def import_lib(base):
     _logger.INFO(f'import_lib-->加载包{base}[{"PKG" if hasattr(mod, '__path__') else "MOD" }] 耗时{cost:.2f}毫秒')
     return mod
 
-def loadlib_by_path(path: str|list[str]) -> List:
+def loadlib_by_paths(path: str|list[str]) -> List:    
+    _modules = []
+    if path:
+        if isinstance(path, str):
+            paths = path.split(',')
+            for p in paths:
+                _modules += loadlib_by_path(p)
+        elif isinstance(path, list):            
+            paths = path
+            for p in paths:
+                _modules += loadlib_by_path(p)        
+    return _modules
+
+def loadlib_by_path(path: str) -> List:
     """
     按 uvicorn 风格字符串加载包/模块
     返回 [模块对象, ...]
@@ -283,7 +296,7 @@ def loadlib_by_path(path: str|list[str]) -> List:
 
     # 3. 加载根
     root_mod = import_lib(base)
-    _logger.DEBUG(f'{dir(root_mod)}')
+    _logger.DEBUG(f'{root_mod.__path__}={dir(root_mod)}')
     loaded = [(base, hasattr(root_mod, '__path__'))]
 
     if recursive is None:               # 仅单个模块
@@ -293,16 +306,26 @@ def loadlib_by_path(path: str|list[str]) -> List:
         raise ValueError(f'{base} 不是包，无法使用 * / **')
 
     # 4. 手动递归
-    def walk(path, prefix):
-        for _, name, ispkg in pkgutil.iter_modules(path):
+    def walk(path, prefix, mod=None):
+        _ignored = []
+        if hasattr(mod, '__ignore__') and hasattr(mod, '__path__'): # 是包，并且含有__ignore__属性，就对下面进行过滤
+            _ignored = getattr(mod, '__ignore__')
+        if not isinstance(_ignored, list):
+            _ignored = []
+            
+        for _, name, ispkg in pkgutil.iter_modules(path):       
+            if name in _ignored:
+                continue
+                 
             full_name = prefix + name
             sub = import_lib(full_name)
             loaded.append((full_name, ispkg))
             if recursive and ispkg:          # ** 模式才继续深入
                 # import_lib(full_name)
-                walk(sub.__path__, full_name + '.')
+                _logger.DEBUG(f'{full_name}={dir(sub)}')
+                walk(sub.__path__, full_name + '.', sub)
 
-    walk(root_mod.__path__, base + '.')
+    walk(root_mod.__path__, base + '.', root_mod)
     return loaded
 
 def get_fullname(obj:any|Type)->str:
@@ -391,7 +414,7 @@ if __name__ == '__main__':
     
     _logger.DEBUG('====')
     
-    path = "dataflow.main"
+    path = "application.test.a.aa.**,application.test.a.bb.**"
     if len(sys.argv) >=2:
         path = sys.argv[1]
     # 1. 仅加载模块
@@ -402,29 +425,31 @@ if __name__ == '__main__':
 
     # 3. 加载 db + 全部递归子模块
     # print(loader.load("dataflow.**"))
-    print(f'========== {path}')
-    print(loadlib_by_path(path))
+    _logger.DEBUG(f'========== {path}')
+    _logger.DEBUG(loadlib_by_paths(path))
     
-    print(get_fullname(''))
-    print(get_fullname(Logger()))
-    print(get_fullname(Logger))
+    exit()
     
-    print(get_generic(list[int]))        # (<class 'list'>, (<class 'int'>,))
-    print(get_generic(dict[str, int]))   # (<class 'dict'>, (<class 'str'>, <class 'int'>))
-    print(get_generic(int))              # (None, ())
+    _logger.DEBUG(get_fullname(''))
+    _logger.DEBUG(get_fullname(Logger()))
+    _logger.DEBUG(get_fullname(Logger))
     
-    print(get_methodname(get_methodname))    
-    print(get_methodname(getAttrPlus))
+    _logger.DEBUG(get_generic(list[int]))        # (<class 'list'>, (<class 'int'>,))
+    _logger.DEBUG(get_generic(dict[str, int]))   # (<class 'dict'>, (<class 'str'>, <class 'int'>))
+    _logger.DEBUG(get_generic(int))              # (None, ())
+    
+    _logger.DEBUG(get_methodname(get_methodname))    
+    _logger.DEBUG(get_methodname(getAttrPlus))
     
     # print(is_user_object(int))
     # print(is_user_object(1))
-    print(is_user_object(dict))
-    print(is_user_object({}))
-    print(is_user_object(Logger))
-    print(is_user_object(_logger))
+    _logger.DEBUG(is_user_object(dict))
+    _logger.DEBUG(is_user_object({}))
+    _logger.DEBUG(is_user_object(Logger))
+    _logger.DEBUG(is_user_object(_logger))
     
     
-    print(is_not_primitive(dict))
-    print(is_not_primitive({}))
-    print(is_not_primitive(Logger))
-    print(is_not_primitive(_logger))
+    _logger.DEBUG(is_not_primitive(dict))
+    _logger.DEBUG(is_not_primitive({}))
+    _logger.DEBUG(is_not_primitive(Logger))
+    _logger.DEBUG(is_not_primitive(_logger))

@@ -1,5 +1,5 @@
 from dataflow.utils.log import Logger
-from dataflow.utils.reflect import loadlib_by_path,get_fullname,get_methodname,is_not_primitive, is_user_object
+from dataflow.utils.reflect import loadlib_by_paths,get_fullname,get_methodname,is_not_primitive, is_user_object
 from dataflow.utils.utils import str_isEmpty
 from fastapi import FastAPI, Request, HTTPException
 from typing import Callable,Type,Any,Optional,Dict
@@ -117,15 +117,15 @@ class Context:
         _contextContainer._context._parseContext()
         _logger.DEBUG(f'加载模块路径{scan_path}开始')        
         
-        _m = []
+        _m = loadlib_by_paths(scan_path)
         
-        if isinstance(scan_path, str):
-            _modules = loadlib_by_path(scan_path)
-            _m += _modules
-        elif isinstance(scan_path, list):
-            for path in scan_path:
-                _modules = loadlib_by_path(path)
-                _m += _modules
+        # if isinstance(scan_path, str):
+        #     _modules = loadlib_by_path(scan_path)
+        #     _m += _modules
+        # elif isinstance(scan_path, list):
+        #     for path in scan_path:
+        #         _modules = loadlib_by_path(path)
+        #         _m += _modules
         
         _logger.DEBUG(f'加载模块路径{scan_path}结束')        
         Context.Event.emit('loaded', _contextContainer._context, _m)
@@ -184,7 +184,7 @@ class Context:
     def _parseContext(self):        
         module_path = 'dataflow.module.**'
         _logger.DEBUG(f'初始化内部模块路径{module_path}开始')
-        _modules = loadlib_by_path(module_path)
+        _modules = loadlib_by_paths(module_path)
         _logger.DEBUG(f'初始化内部模块路径{module_path}结束')
         Context.Event.emit('init', self, _modules)
         pass
