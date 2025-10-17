@@ -16,6 +16,8 @@ import threading
 from typing import Self
 import re
 from string import Template
+from pathlib import Path
+
 
 _logger = Logger('dataflow.utils.config')
 
@@ -184,6 +186,11 @@ def ___resolve_custom_env_var(interpolation_str):
 # 在加载配置之前注册解析器
 OmegaConf.register_new_resolver("env", ___resolve_custom_env_var)
 
+def getValue_plus(_root_, key)->any:
+    v = OmegaConf.select(_root_, key)
+    if v is None:
+        v = os.environ.get(key, None)
+    return v
 
 def colon_default_resolver(expression, _parent_,_node_,_root_):
     """
@@ -196,11 +203,16 @@ def colon_default_resolver(expression, _parent_,_node_,_root_):
     if len(parts) == 1:
         # 没有默认值，直接返回键
         key = parts[0]
-        return OmegaConf.select(_root_, key)
+        # return OmegaConf.select(_root_, key)
+        v = getValue_plus(_root_, key)
+        if v is None:
+            raise ValueError(f'{expression}没有对应值，请确认配置，或者通过'+'${key:default}方式设置默认值')
+        return v
     else:
         # 有默认值的情况
         key, default_value = parts
-        value = OmegaConf.select(_root_, key)
+        # value = OmegaConf.select(_root_, key)
+        value = getValue_plus(_root_, key)
         
         # 如果键不存在，返回默认值
         if value is None:
@@ -268,9 +280,24 @@ class YamlConfigation:
                 _logger.WARN('Load Configuration from local')
             return YamlConfigation._MODEL_CACHE[yaml_path]
         
-    def __init__(self, yaml_path, **kwargs):            
+    @staticmethod
+    def _load_yamlfile_plus(yaml_path):
         # 加载 YAML 配置（支持 ${} 占位符）    
-        c = OmegaConf.load(yaml_path)    
+        # c = OmegaConf.load(yaml_path)    
+        
+        # 改进
+        # 1. 读取文件
+        yaml_path = Path(yaml_path)
+        yaml_text = yaml_path.read_text(encoding="utf-8")                
+        # 2. 替换插值前缀
+        converted_text = convert_yaml_config_txt(yaml_text)        
+        # _logger.DEBUG(converted_text)
+        
+        c = OmegaConf.create(converted_text)
+        return c
+        
+    def __init__(self, yaml_path, **kwargs):                    
+        c = YamlConfigation._load_yamlfile_plus(yaml_path)
         self._c = c
         # OmegaConf.resolve(c)
         self._config = OmegaConf.to_container(c, resolve=True)
@@ -347,7 +374,10 @@ class YamlConfigation:
     
     def mergeFile(self, filepath:str):
         if filepath:
-            update_config = OmegaConf.load(filepath)
+             
+            update_config = YamlConfigation._load_yamlfile_plus(filepath)
+            # update_config = OmegaConf.load(filepath)
+            
             merged = OmegaConf.merge(self._c, update_config)
             self._c = merged
             self._config = OmegaConf.to_container(self._c, resolve=True)
@@ -357,9 +387,17 @@ class YamlConfigation:
         return {}
     
     def value2(self, placeholder:str)->any:
+        placeholder = convert_yaml_config_txt(placeholder)
+        
+        temp_config = OmegaConf.create({"___temp___": placeholder})
+        merged = OmegaConf.merge(self._config_temp, temp_config)
+        return merged['___temp___']
+        
+        # return OmegaConf.resolve(placeholder, self._c)
         # return self._c.resoleve
         #  return OmegaConf.resolve(placeholder, self._c)
         return Template(placeholder).substitute(self._config)
+    
         
     def value(self, placeholder:str):
         if not placeholder:
@@ -391,6 +429,10 @@ class YamlConfigation:
                 merged = OmegaConf.merge(self._config_temp, temp_config)
                 return merged['___temp___']
  
+def convert_yaml_config_txt(text: str, new_prefix: str = "p") -> str:
+    result = convert_interpolation_pattern_enhanced(text, new_prefix)
+    result = result.replace('${'+new_prefix+':env:', '${env:')
+    return result
  
 def convert_interpolation_pattern_enhanced(text: str, new_prefix: str = "p") -> str:
     """
@@ -497,31 +539,31 @@ if __name__ == "__main__":
     print(f'{s} = {config.value(s)}')
     
     
-    # s = 'http://${application.server.host:test}:${application.server.port:test}'
-    # print(f'{s} = {config.value2(s)}')
+    s = 'http://${application.server.host:test}:${application.server.port:test}/${MILVUS.uri1:none}'
+    print(f'{s} = {config.value2(s)}')
     
     simple_case = "连接地址: ${application.app.test:${env:DB_URL:${application.DB_URL:${application.DB_URL:localhost}}}}"
     result1 = convert_interpolation_pattern_enhanced(simple_case)
     print(result1)
     # 输出: 连接地址: ${p:application.app.test}
 
-    # 跳过 env 解析器
-    with_env = "环境变量: ${env:APPLICATION_NAME} 和配置: ${application.app.test}"
-    result2 = convert_interpolation_pattern_enhanced(with_env)
-    print(result2)
-    # 输出: 环境变量: ${env:APPLICATION_NAME} 和配置: ${p:application.app.test}
+    # # 跳过 env 解析器
+    # with_env = "环境变量: ${env:APPLICATION_NAME} 和配置: ${application.app.test}"
+    # result2 = convert_interpolation_pattern_enhanced(with_env)
+    # print(result2)
+    # # 输出: 环境变量: ${env:APPLICATION_NAME} 和配置: ${p:application.app.test}
 
-    # 嵌套替换，跳过已有解析器
-    nested_case = """
+    # # 嵌套替换，跳过已有解析器
+    # nested_case = """
     
-    环境: ${env:APP_ENV:development
-    配置: 
-    环境: ${env:APP_ENV:development}
-    数据库: ${application.db.url:${env:DB_URL:localhost}}
-    端口: ${application.db.port:${env:DB_PORT:5432}}
-    """
-    result3 = convert_interpolation_pattern_enhanced(nested_case)
-    print(result3)
+    # 环境: ${env:APP_ENV:development}}
+    # 配置: 
+    # 环境: ${env:APP_ENV:development}
+    # 数据库: ${application.db.url:${env:DB_URL:localhost}}
+    # 端口: ${application.db.port:${env:DB_PORT:5432}}
+    # """
+    # result3 = convert_interpolation_pattern_enhanced(nested_case)
+    # print(result3)
     # 输出:
     # 配置: 
     #   环境: ${env:APP_ENV:development}
@@ -529,16 +571,16 @@ if __name__ == "__main__":
     #   端口: ${p:application.db.port:${env:DB_PORT:5432}}
 
     # 复杂嵌套
-    complex_case = """
-    应用配置:
-    名称: ${env:APP_NAME:${application.name:默认应用}}
-    日志级别: ${env:LOG_LEVEL:${application.log.level:info}}
-    功能开关: 
-        特性A: ${application.features.a:${env:FEATURE_A:false}}
-        特性B: ${application.features.b:true}
-    """
-    result4 = convert_interpolation_pattern_enhanced(complex_case)
-    print(result4)
+    # complex_case = """
+    # 应用配置:
+    # 名称: ${env:APP_NAME:${application.name:默认应用}}
+    # 日志级别: ${env:LOG_LEVEL:${application.log.level:info}}
+    # 功能开关: 
+    #     特性A: ${application.features.a:${env:FEATURE_A:false}}
+    #     特性B: ${application.features.b:true}
+    # """
+    # result4 = convert_interpolation_pattern_enhanced(complex_case)
+    # print(result4)
     # 输出:
     # 应用配置:
     #   名称: ${env:APP_NAME:${p:application.name:默认应用}}

@@ -3,6 +3,6 @@ context:
     test:
       sample: ${p:test.sample:${p:test.1:12345}}
       # sample: 12345678
-      port: ${env:test.sample:${p:test.1:1200}}
+      port: ${env:test.sample:${p:test.1:${p:test.2:1600}}}
       api-key: sample-key
       api-token: abcdefgf
