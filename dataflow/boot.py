@@ -42,13 +42,15 @@ _logger = Logger()
 class ApplicationBoot:
     scan:str
     application_yaml:str
+    applicationConfig:YamlConfigation
     @staticmethod
-    def Start(application_yaml:str='conf/application.yaml', scan:str|list[str]='application.**', cmd_args:dict={}):
+    def Start(application_yaml:str='conf/application.yaml', scan:str|list[str]='application.**', configuration:dict={}):
         ApplicationBoot.application_yaml = application_yaml
         ApplicationBoot.scan = scan
         
-        _c:YamlConfigation = YamlConfigation.loadConfiguration(application_yaml)
-        _c.merge(cmd_args)
+        _c:YamlConfigation = ApplicationBoot.prepareApplicationConfig(application_yaml, configuration)
+        
+        ApplicationBoot.applicationConfig = _c
         
         host = _c.getStr('application.server.host', 'localhost')
         workers = _c.getInt('application.server.workers', 1)
@@ -70,3 +72,9 @@ class ApplicationBoot:
         _logger.INFO(f"{_c.getStr('application.name', 'DataFlow Application')} {_c.getStr('application.version', '1.0.0')} Start server on {host}:{port}")
         uvicorn.run("dataflow.router.endpoint:app", host=host, port=port, reload=False, workers=workers, headers=[("Server", "my-server/1.0")])
         _logger.INFO(f"{_c.getStr('application.name', 'DataFlow Application')} {_c.getStr('application.version', '1.0.0')} End server on {host}:{port}")        
+        
+    @staticmethod
+    def prepareApplicationConfig(application_yaml:str='conf/application.yaml', configuration:dict={})->YamlConfigation:
+        _c:YamlConfigation = YamlConfigation.loadConfiguration(application_yaml)
+        _c.mergeDict(configuration)
+        return _c

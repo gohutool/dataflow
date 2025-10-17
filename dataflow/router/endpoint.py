@@ -31,7 +31,7 @@ app = FastAPI(lifespan=lifespan,
             #   default_response_class=CustomJSONResponse,            
               version="1.0.0")       
     
-@Context.Context(app=app, application_yaml=ApplicationBoot.application_yaml, scan=ApplicationBoot.scan)
+@Context.Context(app=app, applicationConfiguration=ApplicationBoot.applicationConfig, scan=ApplicationBoot.scan)
 def initApp(app:FastAPI,context:Context):
     _logger.INFO(f'开始初始化App={app} {context}')
     

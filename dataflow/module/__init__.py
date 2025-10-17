@@ -111,8 +111,8 @@ class Context:
         return _contextContainer._context
     
     @staticmethod
-    def initContext(applicationConfig_file:str, scan_path:str|list[str]):
-        _contextContainer._context = Context(applicationConfig_file, scan_path)        
+    def initContext(applicationConfiguration:YamlConfigation=None, scan_path:str|list[str]=None):
+        _contextContainer._context = Context(applicationConfiguration, scan_path)        
         _logger.INFO(f'实例化容器={_contextContainer._context}')
         _contextContainer._context._parseContext()
         _logger.DEBUG(f'加载模块路径{scan_path}开始')        
@@ -130,14 +130,16 @@ class Context:
         _logger.DEBUG(f'加载模块路径{scan_path}结束')        
         Context.Event.emit('loaded', _contextContainer._context, _m)
         
-    def __init__(self, applicationConfig_file:str, scan_path:str):
+    def __init__(self, applicationConfiguration:YamlConfigation=None, scan_path:str=None):
         self._CONTEXT = {}     
         self._CONTEXT_DEP :dict[list[tuple[str,any]]]= {}
         self._INJECT_METHOD_CONTEXT = {}
-        self.appcaltion_file=applicationConfig_file
+        # self.appcaltion_file=applicationConfig_file
         self.scan_path = scan_path
-        self._application_config:YamlConfigation = YamlConfigation.loadConfiguration(self.appcaltion_file)        
-        _logger.INFO(f'实例化容器={applicationConfig_file},{scan_path}')    
+        # self._application_config:YamlConfigation = YamlConfigation.loadConfiguration(self.appcaltion_file)        
+        self._application_config:YamlConfigation = applicationConfiguration
+        # _logger.INFO(f'实例化容器={applicationConfiguration},{scan_path}')
+        _logger.INFO(f'实例化容器={scan_path}')
         
     def getConfigContext(self)->YamlConfigation:
         return self._application_config            
@@ -193,20 +195,20 @@ class Context:
         
     
     @staticmethod
-    def Start_Context(app:FastAPI=None, application_yaml:str='conf/application.yaml', scan:str|list[str]=None):
+    def Start_Context(app:FastAPI=None, applicationConfiguration:YamlConfigation=None, scan:str|list[str]=None):
         if _contextContainer._webcontext is None:            
             WebContext.initContext(app)         
             
         if _contextContainer._context is None:
-            Context.initContext(application_yaml, scan)              
+            Context.initContext(applicationConfiguration, scan)              
         else:
             _logger.WARN('Context已经启动')        
             
         WebContext.Event.emit('loaded', app)
             
     @staticmethod
-    def Context(*,app:FastAPI, application_yaml:str='conf/application.yaml', scan:str|list[str]=None):
-        Context.Start_Context(app, application_yaml, scan)                
+    def Context(*,app:FastAPI, applicationConfiguration:YamlConfigation=None, scan:str|list[str]=None):
+        Context.Start_Context(app, applicationConfiguration, scan)                
         def decorator(func: Callable) -> Callable:            
             type_hints = get_type_hints(func)
             params = {}            

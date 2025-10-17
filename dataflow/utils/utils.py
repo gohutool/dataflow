@@ -17,8 +17,16 @@ import threading
 from itertools import count
 import uuid
 from uuid import UUID as UUIDOBJ
+import sys
+import os
 
 # from pydantic import BaseModel, Field
+
+def set_cn_timezone():    
+    # 设置时区（必须在导入其他时间相关模块前设置）
+    os.environ["TZ"] = "Asia/Shanghai"
+    if hasattr(time, 'tzset'):          # Unix / macOS / WSL
+        time.tzset()
 
 def date_datetime_cn(dt:datetime=None):
     if dt is None:
@@ -557,6 +565,36 @@ def r_bytes(d:bytes, width:int, fillchar=b'\0', trim:bool=False):
         return d.rjust(width, fillchar)
     return d
 
+
+def parse_long_args(argv=sys.argv[1:]) -> dict[str, any]:
+    """
+    把 --a.b.c=value 变成 {'a': {'b': {'c': value}}}
+    支持自动类型推断 int/float/bool
+    """
+    def cast(v: str):
+        if v.isdigit(): 
+            return int(v)
+        try: 
+            return float(v)
+        except ValueError: 
+            pass
+        
+        if v.lower() in ('true', 'false', 'yes', 'no', 'on', 'off'): 
+            return v.lower() == 'true' or v.lower() == 'on' or v.lower() == 'yes'        
+        return v
+
+    cfg: dict = {}
+    
+    for token in argv:
+        if not token.startswith('--') or '=' not in token:
+            continue
+        k, v = token[2:].split('=', 1)
+        keys = k.split('.')
+        d = cfg
+        for kk in keys[:-1]:
+            d = d.setdefault(kk, {})
+        d[keys[-1]] = cast(v)
+    return cfg    
 
 def UUID():
     return uuid.uuid4()
