@@ -1,9 +1,9 @@
 from fastapi import APIRouter,Body
 from dataflow.module import WebContext,Context
 from dataflow.utils.log import Logger
-from dataflow.utils.utils import UUID
+from dataflow.utils.utils import UUID, get_str_from_dict
 from dataflow.module.context.redis import RedisContext
-from dataflow.module.context.web import RequestBind
+from dataflow.module.context.web import RequestBind, create_token
 
 from captcha.image import ImageCaptcha
 import random
@@ -72,7 +72,11 @@ def login(payload: dict = Body(...)):
     if not matches(password, user['password']):
         raise Context.ContextExceptoin('用户名和密码错误')
     
-    return AppReponseVO(data=user).dict()
+    token = create_token(get_str_from_dict(user, 'user_id'), get_str_from_dict(user, 'user_name'))
+    
+    return AppReponseVO(data={
+            'token':token
+        }).dict()
 
 
 

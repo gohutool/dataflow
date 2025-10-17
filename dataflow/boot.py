@@ -43,16 +43,17 @@ class ApplicationBoot:
     scan:str
     application_yaml:str
     @staticmethod
-    def Start(application_yaml:str='conf/application.yaml', scan:str|list[str]='application.**'):
+    def Start(application_yaml:str='conf/application.yaml', scan:str|list[str]='application.**', cmd_args:dict={}):
         ApplicationBoot.application_yaml = application_yaml
         ApplicationBoot.scan = scan
         
-        _c = YamlConfigation.loadConfiguration(application_yaml)
+        _c:YamlConfigation = YamlConfigation.loadConfiguration(application_yaml)
+        _c.merge(cmd_args)
         
-        host = _c.getStr('server.host', 'localhost')
-        workers = _c.getInt('server.workers', 1)
+        host = _c.getStr('application.server.host', 'localhost')
+        workers = _c.getInt('application.server.workers', 1)
         
-        port = _c.getInt('server.port', 9000)
+        port = _c.getInt('application.server.port', 9000)
 
         log_config = _c.getStr('logging.config', None)
         if  log_config is not None and  log_config.strip()!='':

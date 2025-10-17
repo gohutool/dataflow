@@ -2,7 +2,7 @@
 from typing import Callable
 from starlette.middleware.base import BaseHTTPMiddleware
 from dataflow.utils.log import Logger
-from dataflow.utils.utils import str_isEmpty,str_strip, ReponseVO, get_list_from_dict, get_bool_from_dict,current_millsecond,r_str
+from dataflow.utils.utils import str_isEmpty,str_strip, ReponseVO, get_list_from_dict, get_bool_from_dict,current_millsecond,l_str,str2Num
 from dataflow.utils.web.asgi import get_remote_address, CustomJSONResponse,get_ipaddr
 from dataflow.utils.reflect import get_methodname
 from dataflow.module import Context, WebContext
@@ -261,8 +261,8 @@ def init_error_handler(app:FastAPI):
             content=ReponseVO(False, code=422, msg=exc.detail, data=exc.errors)
         )
 
-_ttl_minutes = Context.Value('{context.jwt.ttl_minutes|21600}')
-_secret = r_str(Context.Value('{context.jwt.secret|replace-with-256-bit-secret}'), 32)
+_ttl_minutes = str2Num(Context.Value('${context.jwt.ttl_minutes:21600}'))
+_secret = l_str(Context.Value('${context.jwt.secret:replace-with-256-bit-secret}'), 32, '0')
 
 _logger.DEBUG(f'JWT参数 ttl_minutes={_ttl_minutes} secret={_secret}')
 

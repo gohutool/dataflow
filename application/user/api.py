@@ -1,10 +1,11 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from dataflow.module import WebContext
 from dataflow.module.context.datasource import DataSourceContext
 from dataflow.module.context.redis import RedisContext
 from dataflow.module.context.milvus import MilvusContext
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import ReponseVO
+from dataflow.module.context.web import RequestBind
 from dataflow.module.context.langfuse import LangfuseContext
 
 
@@ -12,6 +13,12 @@ _logger = Logger('application.user')
 
 router = APIRouter(prefix="/users", tags=["用户"])
 _logger.INFO('实例化用户模块')
+
+
+@RequestBind.RequestMapping(WebContext.getRoot(), '/logout')
+def _logout(request:Request):
+    return None
+    
 
 @router.post("/add")
 def create_item(title: str):

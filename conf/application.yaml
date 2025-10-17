@@ -1,25 +1,25 @@
 application:
   name: DataFlow Application
   version: 1.0.1-beta
-
-server:
-  port: ${env:SERVER_PORT:8080}
-  host: ${env:SERVER_HOST:0.0.0.0}
+  server:
+    port: ${env:SERVER_PORT:8080}
+    host: ${env:SERVER_HOST:0.0.0.0}
+    workers: 1
   
 logging:
   level: ${env:LOG_LEVEL:INFO}
   config: conf/logback.yaml
 
-database:
-  host: "${env:DB_HOST:localhost}"
-  port: "${env:DB_PORT:3306}"
-  name: "${env:DB_NAME:app_db}"
-  username: "${env:DB_USER:admin}"
-  password: "${env:DB_PASSWORD:password}"
+# database:
+#   host: "${env:DB_HOST:localhost}"
+#   port: "${env:DB_PORT:3306}"
+#   name: "${env:DB_NAME:app_db}"
+#   username: "${env:DB_USER:admin}"
+#   password: "${env:DB_PASSWORD:password}"
 
 features:
   enabled: true
-  api_url: "https://api.${server.host}:${server.port}/v1"
+  api_url: "https://api.${application.server.host}:${application.server.port}/v1"
 
 context:
   metrics:

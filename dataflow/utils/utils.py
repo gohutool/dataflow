@@ -467,16 +467,16 @@ def getAttrPlus(data:dict, field:str, dv:any=None)->any:
             
     return rtn
 
-def get_str_from_dict(d:dict, k:any, kv:str):
+def get_str_from_dict(d:dict, k:any, kv:str=None):
     v = None
     if k in d:
         v = getAttrPlus(d, k, kv)
     if v is None:
         v = kv
-    return v
+    return str(v)
 
 
-def get_int_from_dict(d:dict, k:any, kv:int):
+def get_int_from_dict(d:dict, k:any, kv:int=0):
     v = None
     if k in d:
         v = getAttrPlus(d, k, kv)
@@ -484,7 +484,7 @@ def get_int_from_dict(d:dict, k:any, kv:int):
         v = kv
     return int(str2Num(v, kv))
 
-def get_float_from_dict(d:dict, k:any, kv:float):
+def get_float_from_dict(d:dict, k:any, kv:float=0):
     v = None
     if k in d:
         v = getAttrPlus(d, k, kv)
@@ -500,7 +500,7 @@ def get_bool_from_dict(d:dict, k:any, kv:bool=False):
         v = kv
     return str2Bool(v, kv)
 
-def get_from_dict(d:dict, k:any, kv:any):
+def get_from_dict(d:dict, k:any, kv:any=None):
     v = None
     if k in d:
         v = getAttrPlus(d, k, kv)
@@ -508,7 +508,7 @@ def get_from_dict(d:dict, k:any, kv:any):
         v = kv
     return v
 
-def get_list_from_dict(d:dict, k:any, kv:any):
+def get_list_from_dict(d:dict, k:any, kv:any=None):
     v = None
     if k in d:
         v = getAttrPlus(d, k, kv)
