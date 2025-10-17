@@ -281,13 +281,15 @@ class YamlConfigation:
             return YamlConfigation._MODEL_CACHE[yaml_path]
         
     @staticmethod
-    def _load_yamlfile_plus(yaml_path):
+    def _load_yamlfile_plus(yaml_path:str|Path):
         # 加载 YAML 配置（支持 ${} 占位符）    
         # c = OmegaConf.load(yaml_path)    
         
         # 改进
         # 1. 读取文件
-        yaml_path = Path(yaml_path)
+        if isinstance(yaml_path, str):
+            yaml_path = Path(yaml_path)
+            
         yaml_text = yaml_path.read_text(encoding="utf-8")                
         # 2. 替换插值前缀
         converted_text = convert_yaml_config_txt(yaml_text)        
@@ -379,7 +381,7 @@ class YamlConfigation:
             return merged
         return {}
     
-    def mergeFile(self, filepath:str):
+    def mergeFile(self, filepath:str|Path):
         if filepath:
              
             update_config = YamlConfigation._load_yamlfile_plus(filepath)
@@ -406,35 +408,36 @@ class YamlConfigation:
         return Template(placeholder).substitute(self._config)
     
         
-    def value(self, placeholder:str):
+    def value(self, placeholder:str)->any:
         if not placeholder:
             return placeholder
-        if '${env' in placeholder:
-            temp_config = OmegaConf.create({"___temp___": placeholder})
-            merged = OmegaConf.merge(self._config_temp, temp_config)
-            return merged['___temp___']        
-        if '${' in placeholder:
-            if ':' in placeholder:
-                key, value = parse_placeholder(placeholder)
-                placeholder = '${' + key + '}' 
-                # print(f'placeholder = {placeholder} value={value}')
-                temp_config = OmegaConf.create({"___temp___": placeholder})
-                merged = OmegaConf.merge(self._config_temp, temp_config)
+        return self.value2(placeholder)
+        # if '${env' in placeholder:
+        #     temp_config = OmegaConf.create({"___temp___": placeholder})
+        #     merged = OmegaConf.merge(self._config_temp, temp_config)
+        #     return merged['___temp___']        
+        # if '${' in placeholder:
+        #     if ':' in placeholder:
+        #         key, value = parse_placeholder(placeholder)
+        #         placeholder = '${' + key + '}' 
+        #         # print(f'placeholder = {placeholder} value={value}')
+        #         temp_config = OmegaConf.create({"___temp___": placeholder})
+        #         merged = OmegaConf.merge(self._config_temp, temp_config)
                                 
-                if '___temp___' in merged:
-                    try:
-                        if merged['___temp___']:
-                            return merged['___temp___']
-                        else:
-                            return value
-                    except Exception:
-                        return value
-                else:
-                    return value
-            else:                
-                temp_config = OmegaConf.create({"___temp___": placeholder})
-                merged = OmegaConf.merge(self._config_temp, temp_config)
-                return merged['___temp___']
+        #         if '___temp___' in merged:
+        #             try:
+        #                 if merged['___temp___']:
+        #                     return merged['___temp___']
+        #                 else:
+        #                     return value
+        #             except Exception:
+        #                 return value
+        #         else:
+        #             return value
+        #     else:                
+        #         temp_config = OmegaConf.create({"___temp___": placeholder})
+        #         merged = OmegaConf.merge(self._config_temp, temp_config)
+        #         return merged['___temp___']
  
 def convert_yaml_config_txt(text: str, new_prefix: str = "p") -> str:
     result = convert_interpolation_pattern_enhanced(text, new_prefix)

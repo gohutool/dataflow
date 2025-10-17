@@ -1,8 +1,7 @@
-context:
-  test:
-    test:
-      sample: ${p:test.sample:${p:test.1:12345}}
-      # sample: 12345678
-      port: ${env:test.sample:${p:test.1:${p:test.2:1600}}}
-      api-key: sample-key
-      api-token: abcdefgf
+application:
+  name: DataFlow Application
+  version: 1.0.2-beta  
+  server:
+    port: ${SERVER_PORT:8080}
+    host: ${SERVER_HOST:0.0.0.0}
+    workers: 1

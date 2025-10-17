@@ -1,5 +1,7 @@
 import uvicorn
 from dataflow.utils.log import Logger, initLogWithYaml
+from dataflow.utils.file import get_file_with_profile
+from dataflow.utils.utils import str_isEmpty
 from dataflow.utils.config import YamlConfigation  # noqa: F401
 import logging
 
@@ -76,5 +78,12 @@ class ApplicationBoot:
     @staticmethod
     def _prepareApplicationConfig(application_yaml:str='conf/application.yaml', configuration:dict={})->YamlConfigation:
         _c:YamlConfigation = YamlConfigation.loadConfiguration(application_yaml)
+        
+        application_profile = _c.getStr('application.profiles.active')
+        
+        if not str_isEmpty(application_profile):
+            application_profile = get_file_with_profile(application_yaml, application_profile)
+            _c.mergeFile(application_profile)
+        
         _c.mergeDict(configuration)
         return _c

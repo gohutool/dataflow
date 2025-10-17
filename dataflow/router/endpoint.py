@@ -5,6 +5,7 @@ from dataflow.boot import ApplicationBoot
 from dataflow.utils.web.asgi import Init_fastapi_jsonencoder_plus
 from contextlib import asynccontextmanager
 from dataflow.utils.log import Logger
+from dataflow.utils.config import YamlConfigation
 from dataflow.module import Context, WebContext
 # from fastapi.middleware.cors import CORSMiddleware
 
@@ -19,6 +20,9 @@ async def lifespan(app: FastAPI):
     WebContext.Event.emit('post_started', app)
     Context.Event.emit('started', Context.getContext())
     
+    _c:YamlConfigation = Context.getContext().getConfigContext()    
+    _logger.INFO(f"{_c.getStr('application.name', 'DataFlow Application')} {_c.getStr('application.version', '1.0.0')} Start server on {_c.getStr('application.server.host', '127.0.0.1')}:{_c.getStr('application.server.port', 8080)} 启动完成")
+        
     yield
     # 关闭时执行的代码
     Context.Event.emit('exit')
