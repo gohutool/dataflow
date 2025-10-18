@@ -33,7 +33,6 @@ antmatcher = AntPathMatcher()
 
 # 自定义装饰器，实现@Controller 注解
 def Controller(app:FastAPI|APIRouter=None, *, prefix: str = "", **ka):
-    
     def decorator(cls):
         # 创建路由器
         router = APIRouter(prefix=prefix, **ka)

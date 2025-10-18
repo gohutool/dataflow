@@ -7,7 +7,7 @@ from dataflow.utils.log import Logger
 from dataflow.utils.utils import ReponseVO
 from dataflow.module.context.web import RequestBind
 from dataflow.module.context.langfuse import LangfuseContext
-
+from application import AppReponseVO
 
 _logger = Logger('application.user')
 
@@ -17,7 +17,8 @@ _logger.INFO('实例化用户模块')
 
 @RequestBind.RequestMapping('/logout', api=WebContext.getRoot())
 def _logout(request:Request):
-    return None
+    return AppReponseVO(data={
+        }).dict()
     
 
 @router.post("/add")

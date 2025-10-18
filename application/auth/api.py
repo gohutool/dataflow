@@ -1,8 +1,8 @@
-from fastapi import APIRouter,Body
+from fastapi import APIRouter,Body  # noqa: F401
 from dataflow.module import WebContext,Context
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import UUID, get_str_from_dict
-from dataflow.module.context.redis import RedisContext
+from dataflow.utils.dbtools.redis import RedisTools
 from dataflow.module.context.web import RequestBind, create_token,Controller
 
 from captcha.image import ImageCaptcha
@@ -27,67 +27,11 @@ def _generate_code(length: int = 4) -> str:
 
 _CAPTCHA_CODE_CACHE_KEY = 'app:captcha:code:'
 
-
-# router = APIRouter(prefix="/auth", tags=["认证"])
-
-# # @router.get('/captchaImage')
-# @RequestBind.GetMapping('/captchaImage', api=router)
-# def captchaImage():
-#     code = _generate_code(4)
-#     captcha_id = UUID().hex
-    
-#     # 生成图片
-#     img = ImageCaptcha(width=160, height=60)
-#     data = img.generate(code)
-#     data = data.read()
-#     img_str = b64_encode(data)
-    
-#     RedisContext.getTool().set(_CAPTCHA_CODE_CACHE_KEY+':'+captcha_id, code, 60)
-    
-#     return AppReponseVO(data={
-#         'captchaEnabled':True,
-#         'img':img_str,
-#         'uuid':captcha_id
-#     }).dict()
-    
-
-# # @router.post('/login')    
-# @RequestBind.RequestMapping('/login', api=router)
-# def login(payload: dict = Body(...)):
-#     username = payload['username']
-#     password = payload['password']
-#     code = payload['code']
-#     uuid = payload['uuid']
-    
-#     _logger.DEBUG(f'usernmae={username} password={password} code={code}, uuid={uuid}')
-    
-#     _code = RedisContext.getTool().get(_CAPTCHA_CODE_CACHE_KEY+':'+uuid)
-    
-#     if not _code:
-#         raise Context.ContextExceptoin('验证码已经失效')
-    
-#     if not code.lower() == _code.lower():
-#         raise Context.ContextExceptoin('验证码输入错误')
-    
-#     userService:UserService = Context.getContext().getBean(UserService)
-#     user = userService.loadUserByUsername(username)
-    
-#     if not matches(password, user['password']):
-#         raise Context.ContextExceptoin('用户名和密码错误')
-    
-#     token = create_token(get_str_from_dict(user, 'user_id'), get_str_from_dict(user, 'user_name'))
-    
-#     return AppReponseVO(data={
-#             'token':token
-#         }).dict()
-
-# WebContext.getRoot().include_router(router)
-
-
-
-
 @Controller(WebContext.getRoot(), prefix='/auth', tags=["认证"])
 class AuthController:
+    redisClient:RedisTools = Context.Autowired()
+    userService:UserService = Context.Autowired()
+    
     @RequestBind.GetMapping('/captchaImage')
     def captchaImage(self):
         code = _generate_code(4)
@@ -99,7 +43,7 @@ class AuthController:
         data = data.read()
         img_str = b64_encode(data)
         
-        RedisContext.getTool().set(_CAPTCHA_CODE_CACHE_KEY+':'+captcha_id, code, 60)
+        self.redisClient.set(_CAPTCHA_CODE_CACHE_KEY+':'+captcha_id, code, 60)
         
         return AppReponseVO(data={
             'captchaEnabled':True,
@@ -107,7 +51,14 @@ class AuthController:
             'uuid':captcha_id
         }).dict()
         
-    @RequestBind.RequestMapping('/login')
+    
+    @RequestBind.GetMapping('/getInfo')
+    def getinfo(self):
+        return AppReponseVO(data={
+        }).dict()
+            
+        
+    @RequestBind.PostMapping('/login')
     def login(self, payload: dict = Body(...)):
         username = payload['username']
         password = payload['password']
@@ -116,7 +67,8 @@ class AuthController:
         
         _logger.DEBUG(f'usernmae={username} password={password} code={code}, uuid={uuid}')
         
-        _code = RedisContext.getTool().get(_CAPTCHA_CODE_CACHE_KEY+':'+uuid)
+        # _code = RedisContext.getTool().get(_CAPTCHA_CODE_CACHE_KEY+':'+uuid)
+        _code = self.redisClient.get(_CAPTCHA_CODE_CACHE_KEY+':'+uuid)
         
         if not _code:
             raise Context.ContextExceptoin('验证码已经失效')
@@ -124,8 +76,9 @@ class AuthController:
         if not code.lower() == _code.lower():
             raise Context.ContextExceptoin('验证码输入错误')
         
-        userService:UserService = Context.getContext().getBean(UserService)
-        user = userService.loadUserByUsername(username)
+        # userService:UserService = Context.getContext().getBean(UserService)
+        # user = userService.loadUserByUsername(username)
+        user = self.userService.loadUserByUsername(username)
         
         if not matches(password, user['password']):
             raise Context.ContextExceptoin('用户名和密码错误')
