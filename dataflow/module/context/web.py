@@ -4,10 +4,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from dataflow.utils.log import Logger
 from dataflow.utils.utils import str_isEmpty,str_strip, ReponseVO, get_list_from_dict, get_bool_from_dict,current_millsecond,l_str,str2Num
 from dataflow.utils.web.asgi import get_remote_address, CustomJSONResponse,get_ipaddr
-from dataflow.utils.reflect import get_methodname
+from dataflow.utils.reflect import get_methodname,get_fullname
 from dataflow.module import Context, WebContext
 from antpathmatcher import AntPathMatcher
-from fastapi import Request, FastAPI, APIRouter
+from fastapi import Request, FastAPI, APIRouter, Depends
 from slowapi import Limiter
 import functools
 # from fastapi.responses import JSONResponse
@@ -16,6 +16,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uuid
 from dataflow.utils.jwt import create_token as _create_token, verify_token as _verify_token
+import inspect
 
 _logger = Logger('dataflow.module.context.web')
 
@@ -30,64 +31,193 @@ antmatcher = AntPathMatcher()
 # )
 # print(variables) # 输出: {'user_id': '123', 'post_id': '456'}
 
+# 自定义装饰器，实现@Controller 注解
+def Controller(app:FastAPI|APIRouter=None, *, prefix: str = "", **ka):
+    
+    def decorator(cls):
+        # 创建路由器
+        router = APIRouter(prefix=prefix, **ka)
+        _logger.WARN(f'{get_fullname(cls)}=>Path:{prefix}')
+        cls_inst = cls()
+        # 获取类的所有方法
+        for name, method in inspect.getmembers(cls_inst, predicate=inspect.ismethod):
+            # 检查方法是否有路由元数据
+            if hasattr(method, '__route_metadata__'):
+                metadata = getattr(method, '__route_metadata__')                
+                # 'path': path,                    
+                # 'methods': tag,
+                # 'kwargs': kwargs                   
+                path = metadata['path']
+                kwargs = metadata['kwargs']
+                tag = metadata['methods']
+                
+                # 为方法添加依赖注入（如果需要）
+                endpoint = method
+                if hasattr(method, '_dependencies'):
+                    # dependencies = getattr(method, '_dependencies')
+                    endpoint = Depends(method)
+                
+                # 添加路由到路由器
+                RequestBind._RequestMapping(path=path, api=router, tag=tag, **kwargs)(endpoint)                
+                _logger.WARN(f'绑定{get_methodname(method)}方法，Method:{tag}, Path:{path}')
+                
+                # router.add_api_route(
+                #     path, 
+                #     endpoint, 
+                #     methods=methods,
+                #     **metadata.get('kwargs', {})
+                # )        
+        # 将路由器保存到类中
+        cls.router = router
+        if app:
+            if isinstance(app, FastAPI):
+                _app:FastAPI = app
+                _app.include_router(cls.router)                
+                _logger.WARN(f'{get_fullname(cls)}已经进行RequestMapping路径{prefix}')                 
+            elif isinstance(app, APIRouter):
+                _app:APIRouter = app
+                _app.include_router(cls.router)
+                _logger.WARN(f'{get_fullname(cls)}已经进行RequestMapping路径{prefix}')                
+            else:
+                raise Context.ContextExceptoin(f'{get_fullname(app)}参数类型出错，app只能是FastAPI或者APIRouter对象，或者为空，通过cls.router获取后设置')
+        else:
+            _logger.WARN(f'{get_fullname(cls)}没有设置FastAPI或者APIRouter对象，需要通过手动获取cls.router后进行request绑定映射到路径{prefix}')
+        return cls
+    
+    return decorator
+
+    # @staticmethod
+    # def GetMapping(*args, **kwargs):
+    #     return RequestBind.GetMapping(None, *args, **kwargs)
+    
+    # @staticmethod
+    # def PostMapping(api:FastAPI|APIRouter=None, *args, **kwargs):
+    #     return RequestBind.PostMapping(None, *args, **kwargs)
+    
+    # @staticmethod
+    # def PutMapping(api:FastAPI|APIRouter=None, *args, **kwargs):
+    #     return RequestBind.PutMapping(None, *args, **kwargs)
+    
+    # @staticmethod
+    # def DeleteMapping(api:FastAPI|APIRouter=None, *args, **kwargs):
+    #     return RequestBind.DeleteMapping(None, *args, **kwargs)
+        
+    # @staticmethod
+    # def OptionsMapping(api:FastAPI|APIRouter=None, *args, **kwargs):
+    #     return RequestBind.OptionsMapping(None, *args, **kwargs)
+    
+    # @staticmethod
+    # def RequestMapping(api:FastAPI|APIRouter=None, *args, **kwargs):
+    #     return RequestBind.RequestMapping(None, *args, **kwargs)
+        
+
 class RequestBind:
     @staticmethod
-    def GetMapping(api:FastAPI|APIRouter, *args, **kwargs):
-        if isinstance(api, FastAPI):
-            api:FastAPI = api
-            return api.get(*args, **kwargs)
-        else:            
-            api:APIRouter = api
-            return api.get(*args, **kwargs)
+    def GetMapping(path:str, *, api:FastAPI|APIRouter=None, **kwargs):
+        # if isinstance(api, FastAPI):
+        #     api:FastAPI = api
+        #     return api.get(*args, **kwargs)
+        # else:            
+        #     api:APIRouter = api
+        #     return api.get(*args, **kwargs)
+        return RequestBind._RequestMapping(path, api=api, tag=['GET'], **kwargs)
             
     @staticmethod
-    def PostMapping(api:FastAPI|APIRouter, *args, **kwargs):
-        if isinstance(api, FastAPI):
-            api:FastAPI = api
-            return api.post(*args, **kwargs)
-        else:            
-            api:APIRouter = api
-            return api.post(*args, **kwargs)
+    def PostMapping(path:str, *, api:FastAPI|APIRouter=None, **kwargs):
+        # if isinstance(api, FastAPI):
+        #     api:FastAPI = api
+        #     return api.post(*args, **kwargs)
+        # else:            
+        #     api:APIRouter = api
+        #     return api.post(*args, **kwargs)
+        return RequestBind._RequestMapping(path, api=api, tag=['POST'], **kwargs)
         
     @staticmethod
-    def PutMapping(api:FastAPI|APIRouter, *args, **kwargs):
-        if isinstance(api, FastAPI):
-            api:FastAPI = api
-            return api.put(*args, **kwargs)
-        else:            
-            api:APIRouter = api
-            return api.put(*args, **kwargs)
+    def PutMapping(path:str, *, api:FastAPI|APIRouter=None, **kwargs):
+        # if isinstance(api, FastAPI):
+        #     api:FastAPI = api
+        #     return api.put(*args, **kwargs)
+        # else:            
+        #     api:APIRouter = api
+        #     return api.put(*args, **kwargs)
+        return RequestBind._RequestMapping(path, api=api, tag=['PUT'], **kwargs)
         
     @staticmethod
-    def DeleteMapping(api:FastAPI|APIRouter, *args, **kwargs):
-        if isinstance(api, FastAPI):
-            api:FastAPI = api
-            return api.delete(*args, **kwargs)
-        else:            
-            api:APIRouter = api
-            return api.delete(*args, **kwargs)
+    def DeleteMapping(path:str, *, api:FastAPI|APIRouter=None, **kwargs):
+        # if isinstance(api, FastAPI):
+        #     api:FastAPI = api
+        #     return api.delete(*args, **kwargs)
+        # else:            
+        #     api:APIRouter = api
+        #     return api.delete(*args, **kwargs)
+        return RequestBind._RequestMapping(path, api=api, tag=['DELETE'], **kwargs)
         
     @staticmethod
-    def OptionsMapping(api:FastAPI|APIRouter, *args, **kwargs):
-        if isinstance(api, FastAPI):
-            api:FastAPI = api
-            return api.options(*args, **kwargs)
-        else:            
-            api:APIRouter = api
-            return api.options(*args, **kwargs)
+    def OptionsMapping(path:str, *, api:FastAPI|APIRouter=None, **kwargs):
+        # if isinstance(api, FastAPI):
+        #     api:FastAPI = api
+        #     return api.options(*args, **kwargs)
+        # else:            
+        #     api:APIRouter = api
+        #     return api.options(*args, **kwargs)
+        return RequestBind._RequestMapping(path, api=api, tag=['OPTIONS'], **kwargs)
+    
+    @staticmethod
+    def _RequestMapping(path:str, *, api:FastAPI|APIRouter=None, tag=['GET'], **kwargs):
+        if api:
+            if not tag:
+                tag = ['GET']
+                
+            if not kwargs:
+                kwargs = {}
+            kwargs['methods']=tag
+            
+            if 'api' in kwargs:
+                kwargs.pop('api')
+                
+            if 'tag' in kwargs:
+                kwargs.pop('tag')
+            
+            _logger.DEBUG(f'{path}进行RequestMapping注册={kwargs}')
+            
+            if isinstance(api, FastAPI):
+                api:FastAPI = api
+                return api.api_route(path, **kwargs)
+            elif isinstance(api, APIRouter):
+                api:APIRouter = api
+                return api.api_route(path, **kwargs)
+            else:
+                raise Context.ContextExceptoin(f'{path}只能设置FastAPI或者APIRouter对象')
+        else:
+            # @functools.wraps(func)
+            _tag = tag
+            if tag is None:
+                tag = ["GET"]
+        
+            def decorator(func):
+                # 存储路由元数据
+                func.__route_metadata__ = {
+                    'path': path,                    
+                    'methods': tag,
+                    'kwargs': kwargs
+                }
+                _logger.DEBUG(f'{get_methodname(func)}没有设定FastAPI或者APIRouter对象，__route_metadata__={func.__route_metadata__}')
+                return func
+            return decorator
         
     @staticmethod
-    def RequestMapping(api:FastAPI|APIRouter, *args, **kwargs):
-        if not kwargs:
-            kwargs = {}
-        kwargs['methods']=['GET','POST','PUT','DELETE']
+    def RequestMapping(path:str, *, api:FastAPI|APIRouter=None, **kwargs):
+        # if not kwargs:
+        #     kwargs = {}
+        # kwargs['methods']=['GET','POST','PUT','DELETE']
         
-        if isinstance(api, FastAPI):
-            api:FastAPI = api            
-            return api.api_route(*args, **kwargs)
-        else:            
-            api:APIRouter = api
-            return api.api_route(*args, **kwargs)
+        # if isinstance(api, FastAPI):
+        #     api:FastAPI = api            
+        #     return api.api_route(*args, **kwargs)
+        # else:            
+        #     api:APIRouter = api
+        #     return api.api_route(*args, **kwargs)
+        return RequestBind._RequestMapping(path, api=api, tag=['GET','POST','PUT','DELETE'], **kwargs)
 
 _filter = []
 

@@ -15,7 +15,7 @@ router = APIRouter(prefix="/users", tags=["用户"])
 _logger.INFO('实例化用户模块')
 
 
-@RequestBind.RequestMapping(WebContext.getRoot(), '/logout')
+@RequestBind.RequestMapping('/logout', api=WebContext.getRoot())
 def _logout(request:Request):
     return None
     

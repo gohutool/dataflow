@@ -4,6 +4,9 @@ from dataflow.utils.file import get_file_with_profile
 from dataflow.utils.utils import str_isEmpty
 from dataflow.utils.config import YamlConfigation  # noqa: F401
 import logging
+from dataflow.utils.utils import parse_long_args,set_cn_timezone
+
+set_cn_timezone()
 
 _logger = Logger()
 
@@ -40,13 +43,12 @@ _logger = Logger()
 # initLogWithYaml('conf/logback.yaml')
 
 
-
 class ApplicationBoot:
     scan:str
     application_yaml:str
     applicationConfig:YamlConfigation
     @staticmethod
-    def Start(application_yaml:str='conf/application.yaml', scan:str|list[str]='application.**', configuration:dict={}):
+    def Start(application_yaml:str='conf/application.yaml', scan:str|list[str]='application.**', configuration:dict=parse_long_args()):
         ApplicationBoot.application_yaml = application_yaml
         ApplicationBoot.scan = scan
         

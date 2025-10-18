@@ -1,6 +1,6 @@
 [project]
 name = "gohutool-dataflow"
-version = "1.0.2b1"                    # 版本顺手+1，避免“文件已存在”
+version = "1.0.2b4"                    # 版本顺手+1，避免“文件已存在”
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
