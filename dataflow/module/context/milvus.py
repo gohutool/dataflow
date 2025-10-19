@@ -11,7 +11,7 @@ _logger = Logger('dataflow.module.context.milvus')
 
 class MilvusContext:
     @staticmethod    
-    def getTool(ds_name:str=None)->MilvusTools:                
+    def getTool()->MilvusTools:                
         return Context.getContext().getBean(get_fullname(MilvusTools))
     
 

@@ -26,3 +26,6 @@ if not importlib.util.find_spec("redis"):
     _logger.WARN('没有redis环境，不加载redis模块，或者pip install redis')
     __ignore__.append('redis')
     
+if not importlib.util.find_spec("etcd3"):
+    _logger.WARN('没有etcd3环境，不加载etcd模块，或者pip install etcd3')
+    __ignore__.append('milvus')    

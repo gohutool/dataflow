@@ -16,7 +16,7 @@ _logger = Logger('dataflow.module.context.redis')
 class RedisContext:
     ENABLED:bool = False
     @staticmethod    
-    def getTool(ds_name:str=None)->RedisTools:                
+    def getTool()->RedisTools:                
         return Context.getContext().getBean(get_fullname(RedisTools))
     @staticmethod ## 过期时间（秒）
     def redis_cache(*,ttl:int=None,prefix:str=None,single:bool=False):

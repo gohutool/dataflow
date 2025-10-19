@@ -47,6 +47,7 @@ class ApplicationBoot:
     scan:str
     application_yaml:str
     applicationConfig:YamlConfigation
+    configuration:dict
     @staticmethod
     def Start(application_yaml:str='conf/application.yaml', scan:str|list[str]='application.**', configuration:dict=parse_long_args()):
         ApplicationBoot.application_yaml = application_yaml
@@ -55,6 +56,7 @@ class ApplicationBoot:
         _c:YamlConfigation = ApplicationBoot._prepareApplicationConfig(application_yaml, configuration)
         
         ApplicationBoot.applicationConfig = _c
+        ApplicationBoot.configuration = configuration
         
         host = _c.getStr('application.server.host', 'localhost')
         workers = _c.getInt('application.server.workers', 1)
