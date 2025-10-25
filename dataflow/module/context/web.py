@@ -17,6 +17,11 @@ from fastapi.middleware.cors import CORSMiddleware
 import uuid
 from dataflow.utils.jwt import create_token as _create_token, verify_token as _verify_token
 import inspect
+from pathlib import Path
+import anyio
+from starlette.staticfiles import StaticFiles as _SF
+from starlette.types import Scope, Receive, Send
+
 
 _logger = Logger('dataflow.module.context.web')
 
@@ -524,6 +529,41 @@ def init_web_common_filter(app:FastAPI):
         _logger.INFO(f"[{request.url}][{ip}] {response.status_code} {cost:.2f}ms")
         return response        
     _logger.DEBUG(f'注册过滤器={xid_handler}')  
+
+class AsyncStaticFiles(_SF):
+    async def get_response(self, path: str, scope):
+        # 确保文件操作是异步的
+        try:
+            return await super().get_response(path, scope)
+        except Exception as e:
+            _logger.ERROR(f"Static file error: {e}")
+            raise
+
+
+@Context.Configurationable(prefix='context.web.static')
+def _config_init_staticFiles(config):
+    if not config:
+        return
+    
+    if 'mapping' in config and config['mapping'] and isinstance(config['mapping'], dict):
+        @WebContext.Event.on_started
+        def print_web_start_test(app):
+            idx = 1            
+            for k, path in config['mapping'].items():
+                k:str = k
+                if not k.startswith('/'):
+                    k = '/' + k
+                    
+                app.mount(f"{k}", AsyncStaticFiles(directory=Path(path), html=True), name=f"static-{k[1:]}")
+                idx += 1
+                _logger.DEBUG(f'静态文件目录路径映射{k}-{path}')
+                
+            if 'root' in config and not str_isEmpty(config['root']):
+                app.mount("/", AsyncStaticFiles(directory=Path(config['root']), html=True), name="static-root")
+                idx += 1
+                _logger.DEBUG(f'静态文件目录路径映射/-{config['root']}')
+    else:
+        _logger.DEBUG('没有静态文件路径映射')
 
 
 @Context.Configurationable(prefix='context.web.cors')

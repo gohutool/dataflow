@@ -76,6 +76,11 @@ context:
     jwt:
       ttl_minutes: 21600
       secret: 'replace-with-256-bit-secret'      # 32 字节以上
+    static:
+      root: app/ETCDV3
+      mapping:
+        /html3: app/ETCDV3
+        /app3: app/ETCDV3        
   stream1:
     kafka:      
       outbound:
