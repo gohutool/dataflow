@@ -1,0 +1,84 @@
+<div style="margin: 0px;">
+</div>
+
+<div class="cubeui-fluid">
+    <fieldset>
+        <legend>键值信息</legend>
+    </fieldset>
+    <div class="cubeui-row">
+        <div class="cubeui-col-sm12">
+            <label class="cubeui-form-label">集合前缀:</label>
+            <div class="cubeui-input-block">
+                <input type="text" readonly data-toggle="cubeui-textbox" name="prefix"
+                       value='{{:prefix}}'>
+            </div>
+        </div>
+    </div>
+    <div class="cubeui-row">
+        <div class="cubeui-col-sm12">
+            <label class="cubeui-form-label">键:</label>
+            <div class="cubeui-input-block">
+                <input type="text" data-toggle="cubeui-textbox" id="edit_key" name="key"
+                       value='{{:key}}' data-options="required:false,prompt:'前缀({{:~js(prefix)}})的后面部分的字符串，必须填写'">
+            </div>
+        </div>
+    </div>
+    <div class="cubeui-row">
+        <div class="cubeui-col-sm12">
+            <label class="cubeui-form-label">值:</label>
+            <div class="cubeui-input-block">
+                <input type="text" data-toggle="cubeui-textarea" name="value" id="edit_value"
+                       value='{{:value}}' data-options="height:250, required:true,prompt:'值，必须填写'">
+            </div>
+        </div>
+    </div>
+
+    <div class="cubeui-row">
+        <div class="cubeui-col-sm6">
+            <label class="cubeui-form-label">租约ID:</label>
+            <div class="cubeui-input-block">
+                <input type="text" data-toggle="cubeui-textbox" name="lease" id="edit_lease"
+                       value='{{:lease}}' data-options="required:false,prompt:'租约ID，选择填写，默认为空，不使用租约'">
+            </div>
+        </div>
+        <div class="cubeui-col-sm3">
+            <label class="cubeui-form-label">使用系统租约ID:</label>
+            <div class="cubeui-input-block">
+                <input id="with_auto_leaase" data-toggle="cubeui-switchbutton" name="auto_leaase"
+                       data-options="value:1,width:'55px',onText:'',offText:''">
+            </div>
+        </div>
+        <div class="cubeui-col-sm3">
+            <div class="cubeui-row cubeui-row-no-margin">
+                <div class="cubeui-col-sm3">
+                    <label class="cubeui-form-label cubeui-form-label-left">租期:</label>
+                </div>
+                <div class="cubeui-col-sm9">
+                    <input type="text" disabled id="with_auto_leaase_ttl" data-toggle="cubeui-numberspinner" name="ttl"
+                           value='' data-options="required:true,value:60,prompt:'租期时间,默认60秒，必须填写',min:0,increment:60">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="cubeui-row">
+        <div class="cubeui-col-sm4">
+            <label class="cubeui-form-label">忽略值:</label>
+            <div class="cubeui-input-block">
+                <input type="text" value='1' disabled id="ignore_value"  name="ignore_value"
+                       data-toggle="cubeui-switchbutton" data-options="value:1,width:'50px',onText:'',offText:''">
+            </div>
+        </div>
+    </div>
+
+    <div class="cubeui-row">
+        <div class="cubeui-col-sm4">
+            <label class="cubeui-form-label">忽略租约:</label>
+            <div class="cubeui-input-block">
+                <input type="text" value='1' disabled id="ignore_lease"  name="ignore_lease"
+                       data-toggle="cubeui-switchbutton" data-options="value:1,width:'50px',onText:'',offText:''">
+            </div>
+        </div>
+    </div>
+
+</div>
