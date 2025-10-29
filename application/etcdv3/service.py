@@ -16,6 +16,26 @@ class EtcdV3Mapper:
     @Selete(datasource='ds04', sql='select * from t_config order by node_name asc')
     def getallconfig(self)->list:
         pass
+    
+    @Update(datasource='ds04', sql='insert into t_config(id,node_name,node_host,node_port,node_demo,createtime) values(:id,:node_name,:node_host,:node_port,:node_demo,:createtime)')
+    def addconfig(self, id, node_name, node_host, node_port, node_demo, createtime)->int:
+        pass
+    
+    @Update(datasource='ds04', sql='''
+            update t_config set node_name=:node_name,node_host=:node_host,node_port=:node_port,
+            node_demo=:node_demo,updatetime=:updatetime where id=:id
+            ''')
+    def updateconfig(self, id, node_name, node_host, node_port, node_demo, updatetime)->int:
+        pass
+    
+    @Selete(datasource='ds04', sql='select * from t_config where id=:id')
+    def getconfig(self, id)->dict:
+        pass
+    
+    @Update(datasource='ds04', sql='delete from t_config where id=:id')
+    def deleteconfig(self, id)->int:
+        pass
+        
 
 @Context.Service()
 class EtcdV3Service:
@@ -56,3 +76,24 @@ class EtcdV3Service:
         rtn['updatetime'] = date2str_yyyymmddddmmss(date_datetime_cn())
         
         return rtn
+    
+    def removeoneconfig(self, id:str)->int:
+        return self.userMapper.deleteconfig(id)
+    
+    def saveoneconfig(self, config:dict)->int:
+        id = get_str_from_dict(config, 'id')
+        node_name = get_str_from_dict(config, 'node_name')
+        node_host = get_str_from_dict(config, 'node_host')
+        node_port = get_str_from_dict(config, 'node_port')
+        node_demo = get_str_from_dict(config, 'node_demo')
+        
+        ctime = date2str_yyyymmddddmmss(date_datetime_cn())        
+        old = self.userMapper.getconfig(id)
+        
+        cnt = 0
+        if old:
+            cnt = self.userMapper.updateconfig(id, node_name, node_host, node_port, node_demo, ctime)
+        else:
+            cnt = self.userMapper.addconfig(id, node_name, node_host, node_port, node_demo, ctime)
+        
+        return cnt

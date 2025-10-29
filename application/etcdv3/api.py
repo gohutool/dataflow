@@ -55,7 +55,21 @@ class ETCDV3Controller:
         return AppReponseVO(data={      
                 "data":data
             }).dict()
-        
+    
+    @RequestBind.PostMapping('/config/saveone')
+    async def saveoneconfig(self, payload: dict):
+        data = self.userService.saveoneconfig(payload)    
+        return AppReponseVO(data={      
+                "data":data
+            }).dict()
+
+    
+    @RequestBind.PostMapping('/config/remove/{id}')
+    async def removeoneconfig(self, id:str):
+        data = self.userService.removeoneconfig(id)
+        return AppReponseVO(data={      
+                "data":data
+            }).dict()
           
     @RequestBind.GetMapping('/ginghan/bar')
     async def ginghan_bar(self):
