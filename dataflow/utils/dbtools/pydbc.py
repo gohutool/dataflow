@@ -1014,7 +1014,14 @@ class TX:
 # 达梦 DM	dmPython	dm+dmPython://u:p@host:5236/db	国产库
 # KingBase	ksycopg2	kingbase+ksycopg2://u:p@host:54321/db
 
-if __name__ == "__main__":    
+if __name__ == "__main__":        
+    url = 'sqlite:///application/db/etcdv3.db'
+    p:PydbcTools = PydbcTools(url=url, test='select 1')
+    print(p)
+    p:PydbcTools = p
+    print(p.queryMany('select * from t_user'))
+    
+    exit()
     
     p:Propagation=Propagation.REQUIRED
     

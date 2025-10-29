@@ -35,7 +35,14 @@ def md5(text: str) -> str:
 def md5_salt(text: str, salt:str='dataflow') -> str:
     return hashlib.md5((text + salt).encode()).hexdigest()
 
+
 def encode_password(plain_pwd: str) -> str:
+    # 生成盐并加密， rounds=10 与 Spring Security 默认一致
+    salt = bcrypt.gensalt(rounds=10)
+    hashed = bcrypt.hashpw(plain_pwd.encode('utf-8'), salt)
+    return hashed.decode('utf-8')   # 存库字段 varchar(60) 即可
+
+def bcrypt_encode(plain_pwd: str) -> str:
     # 生成盐并加密， rounds=10 与 Spring Security 默认一致
     salt = bcrypt.gensalt(rounds=10)
     hashed = bcrypt.hashpw(plain_pwd.encode('utf-8'), salt)

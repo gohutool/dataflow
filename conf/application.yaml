@@ -51,6 +51,9 @@ context:
       username: ${env:PGDS.user:postgres}
       password: ${env:PGDS.password:aiproxy}
       test: select 1
+    ds04:
+      url: sqlite:///application/db/etcdv3.db
+      test: select 1
   redis:
     host: ${env:REDIS.host:localhost}
     port: ${env:REDIS.port:60379}

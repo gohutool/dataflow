@@ -1,6 +1,6 @@
 
 from functools import wraps
-from typing import Callable
+from typing import Callable,Mapping
 from fastapi import Request, HTTPException
 from dataflow.utils.log import Logger
 from antpathmatcher import AntPathMatcher
@@ -118,6 +118,20 @@ def Init_fastapi_jsonencoder_plus():
 
     fastapi.encoders.jsonable_encoder = custom_jsonable_encoder
     # fastapi.encoders.dumps = custom_jsonable_encoder
+    
+def getRequestURLPath(request:Request)->str:
+    return request.url.path
+
+    
+def getRequestHeaders(request:Request)->Mapping[str,str]:
+    return request.headers
+
+def getRequestHeader(request:Request, name:str, dv:str=None)->str:
+    v = getRequestHeaders(request)
+    v = v.get(name)
+    if v:
+        return v
+    return dv
     
 
 if __name__ == "__main__":

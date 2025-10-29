@@ -425,6 +425,8 @@ class Context:
         def __init__(self, *, name:str=None):
             self.name = name
         def _get_binded_key(self, typ:Type, name:str)->str:
+            # if isinstance(typ, str):
+            #     return Context.SERVICE_PREFIX+get_fullname(typ) + '.'+ name
             return Context.SERVICE_PREFIX+get_fullname(typ) + '.'+ name
         def __set_name__(self, owner, name):
             self._serviceimpl = None
@@ -449,6 +451,9 @@ class Context:
         def __set__(self, instance, value):    
             raise Exception('只能使用Autowired的方式注入属性值')
             
+
+# 定义一个上下文变量
+_current_requst_user_context = contextvars.ContextVar('_current_requst_user_object', default=None)
         
 # 定义一个上下文变量
 _current_requst_context = contextvars.ContextVar('_current_requst_context', default=None)
@@ -461,8 +466,17 @@ class WebContext:
     def setRequest(request:Request):
         _current_requst_context.set(request)
     @staticmethod
+    def setRequestUserObject(object:any):
+        _current_requst_user_context.set(object)
+    @staticmethod
+    def getRequestUserObject()->any:
+        return _current_requst_user_context.get()
+    @staticmethod
     def resetRequest():
         _current_requst_context.set(None)
+    @staticmethod
+    def resetRequestUserObject():
+        _current_requst_user_context.set(None)        
     class Event:
         @staticmethod
         def on_loaded(func):  #### (app)

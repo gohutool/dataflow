@@ -364,7 +364,8 @@ def init_error_handler(app:FastAPI):
     
     @app.exception_handler(Exception)
     async def exception_handler(request: Request, exc:Exception):
-        _logger.ERROR(f'处理Expcetion: {exc}', exc)
+        _logger.ERROR(f'处理Expcetion: {exc}')
+        # _logger.ERROR(f'处理Expcetion: {exc}', exc)
         # _logger.ERROR(f'处理Expcetion: {exc}')
         code = getattr(exc, 'code') if hasattr(exec, 'code') else 500
         return CustomJSONResponse(
@@ -388,11 +389,11 @@ def init_error_handler(app:FastAPI):
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc:RequestValidationError):        
         # _logger.ERROR(f'处理RequestValidationError: {exc}', exc)
-        _logger.WARN(f'处理Expcetion: {exc}')
+        _logger.WARN(f'处理Expcetion: {exc.errors()}')
         return CustomJSONResponse(
             status_code=200,
             # content={"code": 422, "message": "参数校验失败", "errors": exc.errors()}
-            content=ReponseVO(False, code=422, msg=exc.detail, data=exc.errors)
+            content=ReponseVO(False, code=422, msg=exc.errors(), data=exc.errors())
         )
 
 _ttl_minutes = str2Num(Context.Value('${context.jwt.ttl_minutes:21600}'))
@@ -416,44 +417,54 @@ def _register_all_filter(_app:FastAPI):
     _filter.sort(key=lambda t: (t[0], t[2]), reverse=False)
     # _filter = sorted(_filter, key=lambda t: (t[0], -_filter.index(t)))
     for v in _filter:
-        _o,app,_path,_ex,func,paths,_excludes=v         
+        _o,app,_path,_ex,func,paths,_excludes=v
+        _logger.DEBUG(f'初始化过滤器{paths}=<{_excludes}>')
         app:FastAPI = app
         if not app:
             app = _app        
         if (paths is None or len(paths) == 0) and (_excludes is None or len(_excludes) == 0):
             app.add_middleware(BaseHTTPMiddleware, dispatch=func)
         else:
-            async def new_func(request: Request, call_next):   
-                if _excludes is not None and len(_excludes)>0 :
-                    for o in _excludes:
-                        if antmatcher.match(o, request.url.path):                        
-                            return await call_next(request)                                                
-                
-                matched = False
-                if paths is not None and len(paths)>0:
-                    for o in paths:
-                        if antmatcher.match(o, request.url.path):
-                            matched = True
-                            break
-                else:
-                    matched = True
-                        
-                if not matched:
-                    return await call_next(request)
-                else:
-                    _logger.DEBUG(f'{request.url.path}被拦截器拦截')
-                    try:
-                        return await func(request, call_next)                                
-                    except HTTPException as e:
-                        raise e
-                    except RequestValidationError as e:
-                        raise e
-                    except StarletteHTTPException as e:
-                        raise e
-                    except Exception as e:
-                        raise Context.ContextExceptoin(detail=e.__str__()) from e
+            def middleware_wrapper(
+                paths_snap=paths,
+                excludes_snap=_excludes,
+                func_snap=func,
+            ):
+                async def new_func(request: Request, call_next):   
+                    if excludes_snap is not None and len(excludes_snap)>0 :
+                        for o in excludes_snap:
+                            if antmatcher.match(o, request.url.path):                        
+                                return await call_next(request)                                                
                     
-            app.add_middleware(BaseHTTPMiddleware, dispatch=new_func)   
+                    matched = False
+                    _logger.DEBUG(f'检查{paths_snap} = {request.url.path}')
+                    if paths_snap is not None and len(paths_snap)>0:
+                        for o in paths_snap:
+                            if antmatcher.match(o, request.url.path):
+                                matched = True
+                                break
+                    else:
+                        matched = True
+                            
+                    if not matched:
+                        return await call_next(request)
+                    else:
+                        _logger.DEBUG(f'{request.url.path}被拦截器拦截')
+                        try:
+                            return await func_snap(request, call_next)                                
+                        except HTTPException as e:
+                            raise e
+                        except RequestValidationError as e:
+                            raise e
+                        except StarletteHTTPException as e:
+                            raise e
+                        except Exception as e:
+                            # raise Context.ContextExceptoin(detail=e.__str__()) from e
+                            raise Context.ContextExceptoin(detail=e.__str__())
+                        
+                return new_func
+                    
+            app.add_middleware(BaseHTTPMiddleware, dispatch=middleware_wrapper(paths, _excludes, func)) 
             
         _logger.DEBUG(f'注册过滤器={get_methodname(func)}[{_o}] path={_path} excludes={_ex}')
     
