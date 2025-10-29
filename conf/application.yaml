@@ -82,8 +82,8 @@ context:
     static:
       root: app/ETCDV3
       mapping:
-        /html3: app/ETCDV3
-        /app3: app/ETCDV3        
+        # /html3: app/ETCDV3
+        # /app3: app/ETCDV3
   stream1:
     kafka:      
       outbound:

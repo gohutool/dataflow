@@ -557,9 +557,9 @@ def _config_init_staticFiles(config):
     if not config:
         return
     
-    if 'mapping' in config and config['mapping'] and isinstance(config['mapping'], dict):
-        @WebContext.Event.on_started
-        def print_web_start_test(app):
+    @WebContext.Event.on_started
+    def print_web_start_test(app):
+        if 'mapping' in config and config['mapping'] and isinstance(config['mapping'], dict):
             idx = 1            
             for k, path in config['mapping'].items():
                 k:str = k
@@ -568,14 +568,12 @@ def _config_init_staticFiles(config):
                     
                 app.mount(f"{k}", AsyncStaticFiles(directory=Path(path), html=True), name=f"static-{k[1:]}")
                 idx += 1
-                _logger.DEBUG(f'静态文件目录路径映射{k}-{path}')
-                
-            if 'root' in config and not str_isEmpty(config['root']):
-                app.mount("/", AsyncStaticFiles(directory=Path(config['root']), html=True), name="static-root")
-                idx += 1
-                _logger.DEBUG(f'静态文件目录路径映射/-{config['root']}')
-    else:
-        _logger.DEBUG('没有静态文件路径映射')
+                _logger.DEBUG(f'静态文件目录路径映射{k}-{path}')        
+            
+        if 'root' in config and not str_isEmpty(config['root']):
+            app.mount("/", AsyncStaticFiles(directory=Path(config['root']), html=True), name="static-root")            
+            _logger.DEBUG(f'静态文件ROOT目录路径映射/-{config['root']}')
+    
 
 
 @Context.Configurationable(prefix='context.web.cors')
