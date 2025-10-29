@@ -489,7 +489,8 @@ def init_web_common_filter(app:FastAPI):
             raise e
         except Exception as e:
             # _logger.ERROR(f"[{rid}] {request.method} {request.url}", e)
-            raise Context.ContextExceptoin(detail=str(e)) from e
+            # raise Context.ContextExceptoin(detail=str(e)) from e
+            raise Context.ContextExceptoin(detail=str(e))
         
         _logger.INFO(f"[{rid}] {request.method} {request.url}")        
         return response    

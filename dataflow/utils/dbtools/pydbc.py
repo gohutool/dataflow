@@ -237,7 +237,7 @@ class PydbcTools:
                         rtn.append(None)
                 return rtn            
         except Exception as e:
-            _logger.ERROR("[Exception]", e)
+            # _logger.ERROR("[Exception]", e)
             raise e
 
     def queryOne(self, sql, params:dict=None)->dict:

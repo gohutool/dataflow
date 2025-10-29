@@ -44,12 +44,13 @@ async def costtime_handler(request: Request, call_next):
     # ====== 继续往后走（路由、业务） ======
     try:
         response = await call_next(request)
-        # ====== 响应阶段 ======
+        # ====== 响应阶段 ======                
+        # response.headers["test-Cost-ms"] = str(cost)
         return response    
     finally:
-        WebContext.resetRequestUserObject()
         cost = (current_millsecond() - start)
         ip = get_remote_address(request)
-        response.headers["test-Cost-ms"] = str(cost)
-        _logger.INFO(f"ETCDV3测试过滤器==[{request.url}][{ip}] {response.status_code} {cost:.2f}ms")
+        _logger.INFO(f"ETCDV3测试过滤器==[{request.url}][{ip}]{cost:.2f}ms")
+        WebContext.resetRequestUserObject()
+        
     

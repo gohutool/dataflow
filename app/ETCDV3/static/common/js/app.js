@@ -1092,8 +1092,8 @@ $.app.get = function(url, datastr, fn, ignoreerror, progressing, requestHeader){
 	$.app.ajax(url, datastr, 'GET', null, fn, ignoreerror, progressing, requestHeader);
 };
 
-$.app.getJson = function(url, datastr, fn, ignoreerror, progressing, requestHeader){
-	$.app.ajax(url, datastr, 'GET', "json", fn, ignoreerror, progressing, requestHeader);
+$.app.getJson = function(url, datastr, fn, ignoreerror, progressing, requestHeader, issync){
+	$.app.ajax(url, datastr, 'GET', "json", fn, ignoreerror, progressing, requestHeader, issync);
 };
 
 $.app.delete = function(url, datastr, fn, ignoreerror, progressing, requestHeader){

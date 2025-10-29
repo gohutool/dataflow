@@ -5,7 +5,7 @@ from dataflow.utils.log import Logger
 from dataflow.utils.utils import UUID, get_str_from_dict
 from dataflow.module.context.web import RequestBind, create_token,Controller
 from application import AppReponseVO
-from application.etcdv3.service import UserService
+from application.etcdv3.service import EtcdV3Service
 from dataflow.utils.sign import b64_decode
 from httpx import AsyncClient
 import httpx
@@ -16,7 +16,7 @@ _logger = Logger('application.etcdv3')
 @Controller(WebContext.getRoot(), prefix='/etcdv3/api', tags=["ETCDV3接口"])
 class ETCDV3Controller:
     pydbcTools:PydbcTools = Context.Autowired(name="ds04")
-    userService:UserService = Context.Autowired()
+    userService:EtcdV3Service = Context.Autowired()
     
     @RequestBind.PostMapping('/login')
     # def login(self, payload: dict = Body(...)):
@@ -48,6 +48,13 @@ class ETCDV3Controller:
                 "count":cnt                          
             }).dict()
         
+    @RequestBind.GetMapping('/config/getall')
+    async def getallconfig(self):
+        # username = WebContext.getRequestUserObject()
+        data = self.userService.getallconfig()    
+        return AppReponseVO(data={      
+                "data":data
+            }).dict()
         
           
     @RequestBind.GetMapping('/ginghan/bar')
