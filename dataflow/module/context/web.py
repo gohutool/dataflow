@@ -615,7 +615,8 @@ def _config_cors_filter(config):
         opts = {
             'allow_origins':get_list_from_dict(config, 'allow_origins', ["*"]),
             'allow_methods':get_list_from_dict(config, 'allow_methods', ["*"]),
-            'allow_headers':get_list_from_dict(config, 'allow_headers', ["*"]),
+            'allow_headers':get_list_from_dict(config, 'allow_headers', ["*"]),            
+            'expose_headers':get_list_from_dict(config, 'expose_headers', ["*"]),
             'allow_credentials':get_bool_from_dict(config, 'allow_credentials', True),
         }
         app.add_middleware(

@@ -308,19 +308,19 @@ initAjax = function(){
 		$.extend(options, {'success':newsuccess});
 
 
-		var newerror = function(request){
+		var newerror = function(xhr){
 			afterSendfn();
 
-			let issessiontime = request.getResponseHeader("is-session-timeout");
-			let isnotauthorized = request.getResponseHeader("is-not-authorized");
-			let isapplicationexception = request.getResponseHeader("is-application-exception");
+			let issessiontime = xhr.getResponseHeader("is-session-timeout");
+			let isnotauthorized = xhr.getResponseHeader("is-not-authorized");
+			let isapplicationexception = xhr.getResponseHeader("is-application-exception");
 
 			let response = {};
 			response.issessiontime=issessiontime;
 			response.isnotauthorized=isnotauthorized;
 			response.isapplicationexception=isapplicationexception;
-			response.xhr=request;
-			response.data= request.responseJSON||{};
+			response.xhr=xhr;
+			response.data= xhr.responseJSON||{};
 
 			if ($.app.afterError && $.isFunction($.app.afterError) && $.app.afterError(options, response)===false){
 				return;
@@ -335,14 +335,14 @@ initAjax = function(){
 				  if(_error){
                       if(data){
                             prepareData4Result(data, -1);
-                            _error.call(this, data, request.status, request);
+                            _error.call(this, data, xhr.status, xhr);
                         }else{
                             prepareData4Result(data, -1);
-                            _error.call(this, data, request.status, request);
+                            _error.call(this, data, xhr.status, xhr);
                         }
 				  }
 
-				  $.app.onSessionTime(request);
+				  $.app.onSessionTime(xhr);
 				  return;
 			  }
 			  else if(response.isnotauthorized && response.isnotauthorized == '1')
@@ -350,10 +350,10 @@ initAjax = function(){
 				  if(_error){
 						if(data){
                             prepareData4Result(data, -1);
-                            _error.call(this, data, request.status, request);
+                            _error.call(this, data, xhr.status, xhr);
                         }else{
                             prepareData4Result(data, -1);
-                            _error.call(this, data, request.status, request);
+                            _error.call(this, data, xhr.status, xhr);
                         }
 				  }
 
@@ -361,7 +361,7 @@ initAjax = function(){
 				  return;
 			  }
 
-			doError(_error, request, _url, options.ignoreerror, _success);
+			doError(_error, xhr, _url, options.ignoreerror, _success);
 		}
 
 		$.extend(options, {'error':newerror});

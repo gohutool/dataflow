@@ -76,6 +76,7 @@ context:
       allow_methods: '*'
       allow_header: '*'
       allow_credentials: yes
+      expose_headers: '*'
     jwt:
       ttl_minutes: 21600
       secret: 'replace-with-256-bit-secret'      # 32 字节以上
