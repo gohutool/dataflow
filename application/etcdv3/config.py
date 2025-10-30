@@ -22,7 +22,7 @@ async def costtime_handler(request: Request, call_next):
     if 'login' not in path:
         auth = getRequestHeader(request, 'authorization', None)
         if not auth:
-            raise Context.ContextExceptoin("没有登录信息，请先进行登录")
+            raise Context.ContextException("没有登录信息，请先进行登录")
         auth = auth.replace('Bearer ','')
         _logger.DEBUG(f'authorization = {auth}')
         

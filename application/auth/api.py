@@ -71,17 +71,17 @@ class AuthController:
         _code = self.redisClient.get(_CAPTCHA_CODE_CACHE_KEY+':'+uuid)
         
         if not _code:
-            raise Context.ContextExceptoin('验证码已经失效')
+            raise Context.ContextException('验证码已经失效')
         
         if not code.lower() == _code.lower():
-            raise Context.ContextExceptoin('验证码输入错误')
+            raise Context.ContextException('验证码输入错误')
         
         # userService:UserService = Context.getContext().getBean(UserService)
         # user = userService.loadUserByUsername(username)
         user = self.userService.loadUserByUsername(username)
         
         if not matches(password, user['password']):
-            raise Context.ContextExceptoin('用户名和密码错误')
+            raise Context.ContextException('用户名和密码错误')
         
         token = create_token(get_str_from_dict(user, 'user_id'), get_str_from_dict(user, 'user_name'))
         

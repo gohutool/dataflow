@@ -116,9 +116,9 @@ prefix = 'context.metrics.prometheus'
 
 @Context.Configurationable(prefix=prefix)
 def _init_metrics_context(config:dict):
-    if config and get_bool_from_dict(config, 'enable'):
+    if config and get_bool_from_dict(config, 'enabled'):
         setup_metrics(WebContext.getRoot())
         _logger.DEBUG(f'初始化Metreics上下文={config}')
     else:
-        _logger.DEBUG(f'没有启动Metreics上下文，设置{prefix}.enable: True启动')
+        _logger.DEBUG(f'没有启动Metreics上下文，设置{prefix}.enabled: True启动')
 

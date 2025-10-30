@@ -1,4 +1,4 @@
-from fastapi import APIRouter,Body,Query,Form  # noqa: F401
+from fastapi import APIRouter,Body,Query,Form,Request,Response  # noqa: F401
 from dataflow.module import WebContext,Context
 from dataflow.utils.dbtools.pydbc import PydbcTools 
 from dataflow.utils.log import Logger
@@ -7,9 +7,12 @@ from dataflow.module.context.web import RequestBind, create_token,Controller
 from application import AppReponseVO
 from application.etcdv3.service import EtcdV3Service
 from dataflow.utils.sign import b64_decode
+from dataflow.utils.web.asgi_proxy import AdvancedProxyService
+from dataflow.utils.web.asgi import getRequestHeader
 from httpx import AsyncClient
 import httpx
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse,JSONResponse
+
 
 _logger = Logger('application.etcdv3')
 
@@ -17,6 +20,7 @@ _logger = Logger('application.etcdv3')
 class ETCDV3Controller:
     pydbcTools:PydbcTools = Context.Autowired(name="ds04")
     userService:EtcdV3Service = Context.Autowired()
+    aps:AdvancedProxyService=Context.Autowired()
     
     @RequestBind.PostMapping('/login')
     # def login(self, payload: dict = Body(...)):
@@ -70,6 +74,29 @@ class ETCDV3Controller:
         return AppReponseVO(data={      
                 "data":data
             }).dict()
+        
+    
+    @RequestBind.PostMapping('/search/saveone/{id}')
+    async def saveonesearch(self, id:str, playload: dict):
+        data = self.userService.saveonesearch(id, playload)
+        return AppReponseVO(data={      
+                "data":data
+            }).dict()        
+    
+    @RequestBind.PostMapping('/search/remove/{id}/{searchid}')
+    async def removeonesearch(self, id:str, searchid:str):
+        data = self.userService.removeonesearch(id, searchid)
+        return AppReponseVO(data={      
+                "data":data
+            }).dict() 
+        
+    @RequestBind.PostMapping('/group/saveone/{id}')
+    async def saveonegroup(self, id:str, playload: dict):        
+        data = self.userService.savegroup(id, playload['group'])
+        return AppReponseVO(data={      
+                "data":data
+            }).dict()       
+           
           
     @RequestBind.GetMapping('/ginghan/bar')
     async def ginghan_bar(self):
@@ -131,4 +158,50 @@ class ETCDV3Controller:
             #     "Content-Disposition": "inline; filename=info.json"
             # }
         )
+    
+    def proxy_prepare_header(self, header:dict)->dict:
+        if header is None:
+            header = {}
+        if 'x-etcd' in header:        
+            if 'authorization' in header:
+                o = header.pop('authorization')
+                _logger.DEBUG(f'移除原有Authorization={o}')
+                    
+            if 'x-authorization' in header:            
+                header['authorization']=header['x-authorization']        
+                o = header.pop('x-authorization')
+                
+        return header
+    
+    @RequestBind.RequestMapping('/proxy/api')
+    async def proxy_api(self, request: Request):
+        target_url = request.query_params.get("url")
+        target_url = target_url if target_url else getRequestHeader(request, "x-target-url", None)        
+        _logger.DEBUG(f'代理目标地址={target_url}')        
+        if not target_url:
+            # 如果没有提供URL参数，尝试从路径推断            
+            return JSONResponse(
+                content={"msg": "没有找到指定地址"},
+                status_code=400,
+                headers={               # ← 这里加任意头
+                    # "is-session-timeout": "1",
+                    # "is-application-exception": "1",
+                })
+        return await self.aps.bind_proxy(request, target_url, self.proxy_prepare_header)
+    
+    @RequestBind.RequestMapping('/proxy/streamapi')
+    async def proxy_stream_api(self, request: Request):
+        target_url = request.query_params.get("url")
+        target_url = target_url if target_url else getRequestHeader(request, "x-target-url", None)
+        _logger.DEBUG(f'代理目标地址={target_url}')
+        if not target_url:
+            # 如果没有提供URL参数，尝试从路径推断            
+            return JSONResponse(
+                content={"msg": "没有找到指定地址"},
+                status_code=400,
+                headers={               # ← 这里加任意头
+                    # "is-session-timeout": "1",
+                    # "is-application-exception": "1",
+                })
+        return await self.aps.bind_streaming_proxy(request, target_url, self.proxy_prepare_header)
         

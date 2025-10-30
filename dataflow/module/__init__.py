@@ -30,7 +30,7 @@ def Value(palceholder:str):
     return Context.Value(palceholder)
 
 class Context:
-    class ContextExceptoin(HTTPException):
+    class ContextException(HTTPException):
         def __init__(
             self,
             detail: Annotated[
@@ -168,7 +168,7 @@ class Context:
         if k in self._CONTEXT:
             return self._CONTEXT[k]
         else:
-            raise Context.ContextExceptoin(f'不能找到{service_name}服务，先注册实例')
+            raise Context.ContextException(f'不能找到{service_name}服务，先注册实例')
     
     def add_dep_info(self, service, target):
         k = str(service)
@@ -552,7 +552,7 @@ def _register_router_for_actuctor(app:FastAPI):
     def actuator_info(itemid:str):
         k = Context.SERVICE_PREFIX + '.' + itemid
         if k not in Context.getContext()._CONTEXT:
-            raise Context.ContextExceptoin('没有找到{itemid}对应服务')
+            raise Context.ContextException('没有找到{itemid}对应服务')
         else:
             serviceImpl = Context.getContext()._CONTEXT[k]
             rtn = {

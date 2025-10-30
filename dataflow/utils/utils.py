@@ -347,6 +347,8 @@ def str2Bool(s: any, dv=False) -> bool:
     return s.lower().strip() in ('true', '1', 'yes', 'on')
 
 def str2Num(s, dv=None):
+    if isinstance(s, (int, float)) and not isinstance(s, bool):
+        return s
     try:
         f = float(s.strip())
         # 去掉 .0 的小数可以转 int
@@ -359,7 +361,9 @@ def str2Num(s, dv=None):
                 raise e
             return dv  # 或返回默认值    
     except Exception as e:    
-        raise e
+        # raise e
+        
+        return dv
 
 def str_is_text_include_checkstr_in_checklist(txt:str, checks:list[str])->bool:  
     if txt is None or len(txt.strip()) == 0:
@@ -490,7 +494,10 @@ def get_int_from_dict(d:dict, k:any, kv:int=0):
         v = getAttrPlus(d, k, kv)
     if v is None:
         v = kv
-    return int(str2Num(v, kv))
+    rtn = str2Num(v, kv)
+    if rtn is None:
+        return rtn        
+    return int(rtn)
 
 def get_float_from_dict(d:dict, k:any, kv:float=0):
     v = None

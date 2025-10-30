@@ -2,8 +2,9 @@
 from typing import Callable
 from starlette.middleware.base import BaseHTTPMiddleware
 from dataflow.utils.log import Logger
-from dataflow.utils.utils import str_isEmpty,str_strip, ReponseVO, get_list_from_dict, get_bool_from_dict,current_millsecond,l_str,str2Num
+from dataflow.utils.utils import str_isEmpty,str_strip, ReponseVO, get_list_from_dict, get_float_from_dict, get_int_from_dict, get_bool_from_dict,current_millsecond,l_str,str2Num
 from dataflow.utils.web.asgi import get_remote_address, CustomJSONResponse,get_ipaddr
+from dataflow.utils.web.asgi_proxy import AdvancedProxyService,ProxyConfig
 from dataflow.utils.reflect import get_methodname,get_fullname
 from dataflow.module import Context, WebContext
 from antpathmatcher import AntPathMatcher
@@ -18,9 +19,9 @@ import uuid
 from dataflow.utils.jwt import create_token as _create_token, verify_token as _verify_token
 import inspect
 from pathlib import Path
-import anyio
+import anyio  # noqa: F401
 from starlette.staticfiles import StaticFiles as _SF
-from starlette.types import Scope, Receive, Send
+from starlette.types import Scope, Receive, Send  # noqa: F401
 
 
 _logger = Logger('dataflow.module.context.web')
@@ -83,7 +84,7 @@ def Controller(app:FastAPI|APIRouter=None, *, prefix: str = "", **ka):
                 _app.include_router(cls.router)
                 _logger.WARN(f'{get_fullname(cls)}已经进行RequestMapping路径{prefix}')                
             else:
-                raise Context.ContextExceptoin(f'{get_fullname(app)}参数类型出错，app只能是FastAPI或者APIRouter对象，或者为空，通过cls.router获取后设置')
+                raise Context.ContextException(f'{get_fullname(app)}参数类型出错，app只能是FastAPI或者APIRouter对象，或者为空，通过cls.router获取后设置')
         else:
             _logger.WARN(f'{get_fullname(cls)}没有设置FastAPI或者APIRouter对象，需要通过手动获取cls.router后进行request绑定映射到路径{prefix}')
         return cls
@@ -191,7 +192,7 @@ class RequestBind:
                 api:APIRouter = api
                 return api.api_route(path, **kwargs)
             else:
-                raise Context.ContextExceptoin(f'{path}只能设置FastAPI或者APIRouter对象')
+                raise Context.ContextException(f'{path}只能设置FastAPI或者APIRouter对象')
         else:
             # @functools.wraps(func)
             _tag = tag
@@ -221,7 +222,7 @@ class RequestBind:
         # else:            
         #     api:APIRouter = api
         #     return api.api_route(*args, **kwargs)
-        return RequestBind._RequestMapping(path, api=api, tag=['GET','POST','PUT','DELETE'], **kwargs)
+        return RequestBind._RequestMapping(path, api=api, tag=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"], **kwargs)
 
 _filter = []
 
@@ -340,61 +341,61 @@ def limiter(rule:str, *, key:Callable|str=None):
 @WebContext.Event.on_loaded
 def init_error_handler(app:FastAPI):
     
-    # 覆盖校验错误
-    @app.exception_handler(Context.ContextExceptoin)
-    async def context_exception_handler(request: Request, exc:Context.ContextExceptoin):        
-        # _logger.ERROR(f'处理RequestValidationError: {exc}', exc)
-        _logger.WARN(f'处理Expcetion: {exc}')
-        return CustomJSONResponse(
-            status_code=exc.status_code,
-            # content={"code": 422, "message": "参数校验失败", "errors": exc.errors()}
-            content=ReponseVO(False, code=exc.code, msg=exc.detail, data=exc.detail)
-        )    
-        
-    @app.exception_handler(HTTPException)
-    async def http_exception_handler(request: Request, exc:HTTPException):
-        # _logger.ERROR(f'处理HttpExpcetion: {exc}', exc)
-        _logger.WARN(f'处理HTTPException: {exc}')
-        return CustomJSONResponse(            
-            status_code=exc.status_code,
-            # content={"code": exc.status_code, "message": exc.detail}
-            content=ReponseVO(False, code=exc.status_code, msg=exc.detail, data=exc.detail)
-        )
-    
     
     @app.exception_handler(Exception)
-    async def exception_handler(request: Request, exc:Exception):
-        _logger.ERROR(f'处理Expcetion: {exc}')
+    async def exception_handler(request: Request, exception:Exception):
+        
+        
+        if isinstance(exception, Context.ContextException):
+            return await context_exception_handler(request, exception)
+        if isinstance(exception, RequestValidationError):
+            return await validation_exception_handler(request, exception)
+        if isinstance(exception, HTTPException):
+            return await http_exception_handler(request, exception)
+        
+        _logger.ERROR(f'处理Expcetion: {exception}')
         # _logger.ERROR(f'处理Expcetion: {exc}', exc)
         # _logger.ERROR(f'处理Expcetion: {exc}')
-        code = getattr(exc, 'code') if hasattr(exec, 'code') else 500
+        code = getattr(exception, 'code', 500)
+        
         return CustomJSONResponse(
             status_code=code,
             # content={"code": exc.status_code, "message": exc.detail}
-            content=ReponseVO(False, code=code, msg=exc.__str__(), data=exc.__str__())
+            content=ReponseVO(False, code=code, msg=exception.__str__(), data=exception.__str__())
         )
               
-    # 覆盖 HTTPException
-    @app.exception_handler(StarletteHTTPException)
-    async def http_fastapi_exception_handler(request: Request, exc:StarletteHTTPException):        
-        # _logger.ERROR(f'处理Expcetion: {exc}', exc)
-        _logger.WARN(f'处理StarletteHTTPExceptionn: {exc}')
-        return CustomJSONResponse(
-            status_code=exc.status_code,
+        
+    @app.exception_handler(HTTPException)
+    async def http_exception_handler(request: Request, exception:HTTPException):
+        # _logger.ERROR(f'处理HttpExpcetion: {exc}', exc)
+        _logger.WARN(f'处理HTTPException: {exception}')
+        return CustomJSONResponse(            
+            status_code=exception.status_code,
             # content={"code": exc.status_code, "message": exc.detail}
-            content=ReponseVO(False, code=exc.status_code, msg=exc.detail, data=exc.detail)
+            content=ReponseVO(False, code=exception.status_code, msg=exception.detail, data=exception.detail)
         )
-  
+    
     # 覆盖校验错误
     @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request: Request, exc:RequestValidationError):        
+    async def validation_exception_handler(request: Request, exception:RequestValidationError):        
         # _logger.ERROR(f'处理RequestValidationError: {exc}', exc)
-        _logger.WARN(f'处理Expcetion: {exc.errors()}')
+        _logger.WARN(f'处理Expcetion: {exception.errors()}')
         return CustomJSONResponse(
             status_code=200,
             # content={"code": 422, "message": "参数校验失败", "errors": exc.errors()}
-            content=ReponseVO(False, code=422, msg=exc.errors(), data=exc.errors())
+            content=ReponseVO(False, code=422, msg=exception.errors(), data=exception.errors())
         )
+    
+    # 覆盖校验错误
+    @app.exception_handler(Context.ContextException)
+    async def context_exception_handler(request: Request, exception:Context.ContextException):        
+        # _logger.ERROR(f'处理RequestValidationError: {exc}', exc)
+        _logger.WARN(f'处理Expcetion: {exception}')
+        return CustomJSONResponse(
+            status_code=exception.status_code,
+            # content={"code": 422, "message": "参数校验失败", "errors": exc.errors()}
+            content=ReponseVO(False, code=exception.code, msg=exception.detail, data=exception.detail)
+        )    
 
 _ttl_minutes = str2Num(Context.Value('${context.jwt.ttl_minutes:21600}'))
 _secret = l_str(Context.Value('${context.jwt.secret:replace-with-256-bit-secret}'), 32, '0')
@@ -460,7 +461,8 @@ def _register_all_filter(_app:FastAPI):
                             raise e
                         except Exception as e:
                             # raise Context.ContextExceptoin(detail=e.__str__()) from e
-                            raise Context.ContextExceptoin(detail=e.__str__())
+                            raise Context.ContextException(detail=e.__str__())
+                            # raise HTTPException(200, detail=e.__str__())
                         
                 return new_func
                     
@@ -479,7 +481,7 @@ def init_web_common_filter(app:FastAPI):
             rid = request.state.xid
         try:                        
             response = await call_next(request)
-        except Context.ContextExceptoin as e:
+        except Context.ContextException as e:
             raise e
         except HTTPException as e:
             raise e
@@ -490,7 +492,7 @@ def init_web_common_filter(app:FastAPI):
         except Exception as e:
             # _logger.ERROR(f"[{rid}] {request.method} {request.url}", e)
             # raise Context.ContextExceptoin(detail=str(e)) from e
-            raise Context.ContextExceptoin(detail=str(e))
+            raise Context.ContextException(detail=str(e))
         
         _logger.INFO(f"[{rid}] {request.method} {request.url}")        
         return response    
@@ -575,6 +577,33 @@ def _config_init_staticFiles(config):
             _logger.DEBUG(f'静态文件ROOT目录路径映射/-{config['root']}')
     
 
+@Context.Configurationable(prefix='context.web.proxy')
+def _config_init_proxy(config):
+    if not config:
+        return
+    _logger.DEBUG(f'代理服务配置={config}')
+    ison = get_bool_from_dict(config, 'enabled', False)
+    
+    if not ison:
+        return 
+    
+    @Context.Service()
+    def init_proxy_config():
+        _proxy_config = ProxyConfig(
+            timeout=get_float_from_dict(config, "timeout", 30.0),
+            max_connections=get_int_from_dict(config, "max_connections", 100),
+            enable_caching=get_bool_from_dict(config, "enable_caching", False),
+            cache_ttl=get_int_from_dict(config, "cache_ttl", 300),
+            rate_limit=get_int_from_dict(config, "rate_limit", None),
+            blocked_user_agents=get_list_from_dict(config, "blocked_user_agents", None)
+        )
+        
+        _aps = AdvancedProxyService(_proxy_config)
+        # Context.getContext().registerBean(get_fullname(AdvancedProxyService))
+        _logger.DEBUG(f'初始化代理服务成功,并进行注册，可以使用getBean(AdvancedProxyService),获取服务实例=>{_aps}[{_proxy_config}]')
+        return _aps
+        
+    
 
 @Context.Configurationable(prefix='context.web.cors')
 def _config_cors_filter(config):

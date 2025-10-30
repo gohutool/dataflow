@@ -65,13 +65,19 @@ $.app.beforeRequest = function (options){
     if(options.headers && options.headers.isetcd){
         //let data = options.data;
         options.isetcd = options.headers.isetcd
+		options.headers['x-etcd'] = true
+        // delete options.headers.Authorization
 
-        delete options.headers.Authorization
+        // if(!$.extends.isEmpty(options.headers.token)){
+        //     options.headers.Authorization = options.headers.token
 
-        if(!$.extends.isEmpty(options.headers.token)){
-            options.headers.Authorization = options.headers.token
-
-        }
+        // }
+		
+		// delete options.headers.Authorization
+		
+		if(!$.extends.isEmpty(options.headers.token)){
+		    options.headers['x-Authorization'] = options.headers.token
+		}
 
         delete options.headers.isetcd
         delete options.headers.uid
@@ -111,6 +117,7 @@ $.etcd.ajaxStream = function(url, datastr, fn, requestHeader, options){
     }
 
     requestHeader['Content-Type'] = 'application/json; charset=UTF-8';
+	requestHeader['x-target-url'] = url;
     /**/
 
     if(!$.extends.isEmpty(requestHeader.token)){
@@ -133,7 +140,7 @@ $.etcd.ajaxStream = function(url, datastr, fn, requestHeader, options){
         )
  */
 
-    $.app.ajaxStream(url, opt,
+    $.app.ajaxStream(API_URL+'/proxy/streamapi', opt,
         function(xhr, state, chunk){
         if(!$.extends.isEmpty(chunk)){
             if(fn){
@@ -141,6 +148,15 @@ $.etcd.ajaxStream = function(url, datastr, fn, requestHeader, options){
             }
         }
     });
+	
+    // $.app.ajaxStream(url, opt,
+    //     function(xhr, state, chunk){
+    //     if(!$.extends.isEmpty(chunk)){
+    //         if(fn){
+    //             fn(xhr, state, chunk)
+    //         }
+    //     }
+    // });
 }
 
 $.etcd.getJson = function(url, datastr, fn, requestHeader, progressing, issync){
@@ -156,8 +172,10 @@ $.etcd.getJson = function(url, datastr, fn, requestHeader, progressing, issync){
     }
 
     requestHeader['Content-Type'] = 'application/json; charset=UTF-8';
-
-    $.app.ajax(url, datastr, 'GET', "json", fn, true, progressing, requestHeader, issync);
+	requestHeader['x-target-url'] = url;
+	
+	$.app.ajax(API_URL+'/proxy/api', datastr, 'GET', "json", fn, true, progressing, requestHeader, issync);
+    // $.app.ajax(url, datastr, 'GET', "json", fn, true, progressing, requestHeader, issync);
 };
 
 
@@ -174,8 +192,10 @@ $.etcd.postJson = function(url, datastr, fn, requestHeader, progressing, issync)
     }
 
     requestHeader['Content-Type'] = 'application/json; charset=UTF-8';
-
-    $.app.ajax(url, datastr, 'POST', "json", fn, true, progressing, requestHeader, issync);
+	requestHeader['x-target-url'] = url;
+	
+	$.app.ajax(API_URL+'/proxy/api', datastr, 'POST', "json", fn, true, progressing, requestHeader, issync);
+    // $.app.ajax(url, datastr, 'POST', "json", fn, true, progressing, requestHeader, issync);
 };
 
 $.etcd.callback = {

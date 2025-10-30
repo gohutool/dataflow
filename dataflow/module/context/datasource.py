@@ -41,7 +41,7 @@ def TX(tx_name:str=None, *, propagation:Propagation=Propagation.REQUIRED,rollbac
     if tx_name and isinstance(tx_name, str):
         tx = Bean(tx_name)
     elif tx_name:
-        raise Context.ContextExceptoin('只能使用TransacrtionManager实例名称作为参数')
+        raise Context.ContextException('只能使用TransacrtionManager实例名称作为参数')
     else:
         tx = Bean(get_fullname(TransactionManager))
         
