@@ -118,11 +118,15 @@ $.etcd.ajaxStream = function(url, datastr, fn, requestHeader, options){
 
     requestHeader['Content-Type'] = 'application/json; charset=UTF-8';
 	requestHeader['x-target-url'] = url;
+	
+	requestHeader['x-etcd'] = true
+	
     /**/
 
     if(!$.extends.isEmpty(requestHeader.token)){
-        requestHeader.Authorization = requestHeader.token;
-        delete requestHeader.token;
+		requestHeader['x-Authorization'] = requestHeader.token
+        // requestHeader.Authorization = requestHeader.token;
+        // delete requestHeader.token;
 
     }
 

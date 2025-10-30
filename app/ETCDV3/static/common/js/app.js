@@ -465,6 +465,12 @@ initAjax = function(){
 initAjax();
 
 $.app.ajaxStream = function(url, options, onreadystatechange){
+	
+	
+	var header = {
+	             	        uid: $.app.localStorage.getItem(window.app.clientId+'.userid', '') ,
+	             	        Authorization: $.app.localStorage.getItem(window.app.clientId+'.tokenType', 'Bearer') + " " + $.app.localStorage.getItem(window.app.clientId+'.token', '')
+	                       };
 
 	// ----- myReadyStateChange(): this will do my incremental processing -----
 	var last_start = 0; // using global var for over-simplified example
@@ -487,6 +493,8 @@ $.app.ajaxStream = function(url, options, onreadystatechange){
 
 	options.onreadystatechange = myReadyStateChange
 	options.cache = false;
+	$.extend(options.headers, header);
+	// options.headers = header
 
 	if($.extends.isEmpty(options.method)){
 		options['method'] = 'POST';
