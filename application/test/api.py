@@ -1,4 +1,4 @@
-from dataflow.utils.utils import ReponseVO, date_datetime_cn, date2str_yyyymmddhhmmsss
+from dataflow.utils.utils import ReponseVO, date_datetime_cn, date2str_yyyymmddhhmmsss,json_to_str
 
 from dataflow.module import Context,WebContext
 from dataflow.utils.log import Logger
@@ -9,6 +9,10 @@ from dataflow.module.context.redis import RedisContext
 from dataflow.module.context.kafka import KafkaContext
 
 from application.test.service import ItemService, getInfos, UerService
+import httpx
+import asyncio
+from fastapi.responses import StreamingResponse
+
 
 _logger = Logger('application.test.api')
 
@@ -91,7 +95,83 @@ async def test_context_value(request:Request):
     _logger.INFO('测试Value组件')
     return ReponseVO(data=Context.Value('${env:LANGFUSE.secret_key:1-sk-lf-b60f4b33-ff5a-46ac-9086-e776373c86da}'))
 
+async def sse_gen(request:Request):
+    idx = 0
+    while not await request.is_disconnected():   # ← 关键：客户端断线就跳出
+        idx += 1
+        _logger.WARN(f'CURRENT={idx}')
+        obj = {
+            "result": {
+                "header": {
+                    "cluster_id": "14841639068965178418",
+                    "member_id": "10276657743932975437",
+                    "revision": str(1329880+idx),
+                    "raft_term": "5"
+                },
+                "watch_id": str(1761887538896+idx)
+            }
+        }
+        if idx ==1 :
+            obj["result"]["created"] = True
+        else: 
+            obj["result"]["events"] = [
+                        {
+                            "kv": {
+                                "key": "dGVzdA==",
+                                "create_revision": "1329615",
+                                "mod_revision": "1329884",
+                                "version": "4",
+                                "value": "dGVzdDExMTExMXZ2dnZ2dmJiYmJ2dnY="
+                            }
+                        }
+                    ]
+            
+        yield json_to_str(obj)
+        # yield json_to_str({
+        #     'data':idx
+        #     })
+        # idx += 1
+        try:
+            await asyncio.sleep(1)
+        except asyncio.CancelledError:           # 额外保险：sleep 被取消也结束
+            break
 
+@app.post("/v3/stream")
+async def sse(request: Request):
+    return StreamingResponse(sse_gen(request),
+                             media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache"})
+
+@app.post("/v3/watch")
+async def watch(request: Request):
+    async with httpx.AsyncClient() as client, \
+               client.stream("POST",
+                            #  "http://localhost:12379/v3/watch",
+                            "http://localhost:8080/v3/stream",
+                             headers=request.headers.raw,
+                             content=await request.body()) as resp:
+        try:
+            async def generate():
+                try:
+                    async for chunk in resp.aiter_bytes():
+                        yield chunk
+                except asyncio.CancelledError:
+                    # 当客户端断开时，会在这里抛出 CancelledError
+                    print("Client disconnected, closing stream")
+                    # 我们可以在这里做一些清理工作，但是 resp 的上下文管理器会帮我们关闭连接
+                    raise
+
+            return StreamingResponse(generate(),
+                                        status_code=resp.status_code,
+                                        headers=resp.headers)
+        except Exception as e:
+            print(f"Error in watch: {e}")
+            raise
+            
+        # return StreamingResponse(resp.aiter_bytes(),
+        #                          status_code=resp.status_code,
+        #                          headers=resp.headers)
+        
 @app.get("/test/getrequest")
 async def test_get_request():
     _logger.INFO('测试获取Request组件')

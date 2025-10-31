@@ -110,7 +110,48 @@ $.app.afterError = function (options, response){
 
 $.etcd = {}
 
+
 $.etcd.ajaxStream = function(url, datastr, fn, requestHeader, options){
+	
+	    if(requestHeader == null){
+	        requestHeader = {};
+	    }
+	
+	    requestHeader['Content-Type'] = 'application/json; charset=UTF-8';
+	    /**/
+	
+	    if(!$.extends.isEmpty(requestHeader.token)){
+	        requestHeader.Authorization = requestHeader.token;
+	        delete requestHeader.token;
+	
+	    }
+	
+	    let opt = $.extend({
+	        headers:requestHeader,
+	        method:'POST',
+	        data:datastr
+	    }, options);
+	/*
+	    if(successFn)
+	        options.success = successFn;
+	
+	    if(errorFn)
+	        options.error = errorFn;
+	        )
+	 */
+	
+	    $.app.ajaxStream(url, opt,
+	        function(xhr, state, chunk){
+	        if(!$.extends.isEmpty(chunk)){
+	            if(fn){
+	                fn(xhr, state, chunk)
+	            }
+	        }
+	    });
+
+}
+
+$.etcd.ajaxStream1 = function(url, datastr, fn, requestHeader, options){
 
     if(requestHeader == null){
         requestHeader = {};
@@ -118,11 +159,12 @@ $.etcd.ajaxStream = function(url, datastr, fn, requestHeader, options){
 
     requestHeader['Content-Type'] = 'application/json; charset=UTF-8';
 	requestHeader['x-target-url'] = url;
+	requestHeader['x-target-url'] = 'http://localhost:8080/v3/stream';
 	
-	requestHeader['x-etcd'] = true
+	// requestHeader['x-etcd'] = true
 	
     /**/
-
+	// requestHeader['x-Authorization'] = requestHeader['x-Authorization']
     if(!$.extends.isEmpty(requestHeader.token)){
 		requestHeader['x-Authorization'] = requestHeader.token
         // requestHeader.Authorization = requestHeader.token;
@@ -144,7 +186,7 @@ $.etcd.ajaxStream = function(url, datastr, fn, requestHeader, options){
         )
  */
 
-    $.app.ajaxStream(API_URL+'/proxy/streamapi', opt,
+    $.app.ajaxStream(url, opt,
         function(xhr, state, chunk){
         if(!$.extends.isEmpty(chunk)){
             if(fn){
@@ -152,6 +194,14 @@ $.etcd.ajaxStream = function(url, datastr, fn, requestHeader, options){
             }
         }
     });
+	// $.app.ajaxStream(API_URL+'/proxy/streamapi', opt,
+	//     function(xhr, state, chunk){
+	//     if(!$.extends.isEmpty(chunk)){
+	//         if(fn){
+	//             fn(xhr, state, chunk)
+	//         }
+	//     }
+	// });
 	
     // $.app.ajaxStream(url, opt,
     //     function(xhr, state, chunk){
