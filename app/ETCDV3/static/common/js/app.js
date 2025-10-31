@@ -464,7 +464,7 @@ initAjax = function(){
 
 initAjax();
 
-$.app.ajaxStream = function(url, options, onreadystatechange){
+$.app.ajaxStream1 = function(url, options, onreadystatechange){
 	
 	
 	// var header = {
@@ -494,6 +494,52 @@ $.app.ajaxStream = function(url, options, onreadystatechange){
 	options.onreadystatechange = myReadyStateChange
 	options.cache = false;
 	// $.extend(options.headers, header);
+	// options.headers = header
+
+	if($.extends.isEmpty(options.method)){
+		options['method'] = 'POST';
+	}
+
+	if(!$.extends.isEmpty(options.data)){
+		if(typeof options.data == 'object'){
+			options.data=$.extends.json.tostring(options.data)
+		}
+	}
+
+	return $.app.jqueryAjax(url, options);
+
+}
+
+$.app.ajaxStream = function(url, options, onreadystatechange){
+	
+	
+	var header = {
+	             	        uid: $.app.localStorage.getItem(window.app.clientId+'.userid', '') ,
+	             	        Authorization: $.app.localStorage.getItem(window.app.clientId+'.tokenType', 'Bearer') + " " + $.app.localStorage.getItem(window.app.clientId+'.token', '')
+	                       };
+
+	// ----- myReadyStateChange(): this will do my incremental processing -----
+	var last_start = 0; // using global var for over-simplified example
+
+	function myReadyStateChange(xhr /*, jqxhr */) {
+		if(xhr.readyState >= 3 && xhr.responseText.length > last_start) {
+			let chunk = xhr.responseText.slice(last_start);
+			last_start += chunk.length;
+			//alert('Got chunk: ' + chunk);
+			//console.log('Got chunk: ', chunk);
+			if(onreadystatechange){
+				onreadystatechange(xhr, xhr.readyState, chunk)
+			}
+		}else{
+			if(onreadystatechange){
+				onreadystatechange(xhr, xhr.readyState, null)
+			}
+		}
+	}
+
+	options.onreadystatechange = myReadyStateChange
+	options.cache = false;
+	$.extend(options.headers, header);
 	// options.headers = header
 
 	if($.extends.isEmpty(options.method)){

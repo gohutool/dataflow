@@ -6,6 +6,9 @@ from typing import Dict, Optional, Callable
 from dataclasses import dataclass
 from contextlib import asynccontextmanager
 from dataflow.utils.log import Logger
+import asyncio
+import requests
+import json
 
 _logger = Logger('dataflow.utils.web.asgi_proxy')
 
@@ -288,17 +291,35 @@ class AdvancedProxyService:
                     _tmp = header_callback(headers)
                     if _tmp is not None:
                         headers = _tmp
+                        
+                
+                headers.update({
+                    "Accept": "text/event-stream",
+                    "Connection": "keep-alive",
+                    "Cache-Control": "no-cache"
+                })
+                
+                body_content = await request.body()
                     
                 async with client.stream(
                     method=request.method,
                     url=url,
                     headers=headers,
-                    params=dict(request.query_params)
+                    params=dict(request.query_params),
+                    content=body_content
                 ) as response:
                     
                     async def generate():
-                        async for chunk in response.aiter_bytes():
-                            yield chunk
+                        try:
+                            async for chunk in response.aiter_bytes():
+                                yield chunk                            
+                        except asyncio.CancelledError:
+                            # 当客户端断开时，会在这里抛出 CancelledError
+                            _logger.DEBUG("Client disconnected, closing stream")
+                            # 我们可以在这里做一些清理工作，但是 resp 的上下文管理器会帮我们关闭连接
+                            raise
+                        except Exception as e:
+                            raise e
                     
                     return StreamingResponse(
                         generate(),
@@ -321,4 +342,75 @@ def get_default_config():
     return _default_config
 
 
+def sync_stream_with_requests(url, method='GET', data=None, headers=None, func:Callable=None)->int:
+    """使用 requests 进行流式请求"""
+    try:
+        response = requests.request(
+            method=method,
+            url=url,
+            data=data,
+            headers=headers,
+            stream=True,  # 关键参数
+            timeout=30
+        )
+        
+        # 检查响应状态
+        if response.status_code != 200:
+            # print(f"请求失败，状态码: {response.status_code}")
+            raise Exception(f"请求失败，状态码: {response.status_code}")
+        
+        # print(f"开始接收流式数据 (状态码: {response.status_code})")
+        # print(f"Content-Type: {response.headers.get('content-type')}")
+        
+        # 逐块读取数据
+        bytes_received = 0
+        # start_time = time.time()
+        
+        for chunk in response.iter_content(chunk_size=1024):
+            if chunk:  # 过滤掉 keep-alive 新块
+                bytes_received += len(chunk)
+                
+                if callable(func):
+                    rtn = func(chunk, bytes_received)
+                    if rtn:
+                        return
+                
+                # elapsed = time.time() - start_time
+                
+                # # 尝试解码为文本
+                # try:
+                #     text = chunk.decode('utf-8')
+                #     print(f"[{elapsed:.2f}s] 收到数据: {text.strip()}")
+                # except UnicodeDecodeError:
+                #     print(f"[{elapsed:.2f}s] 收到二进制数据: {len(chunk)} 字节")
+                
+        # print(f"流式传输完成，总共接收: {bytes_received} 字节")
+        return bytes_received
+    except requests.exceptions.RequestException as e:
+        raise e
+    except Exception as e:
+        raise e
+        
+if __name__ == "__main__":
+    # 测试 Server-Sent Events
+    url = "http://localhost:8080/v3/stream"
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "text/event-stream"
+    }
+    data = json.dumps({
+        "create_request": {
+            "key": "dGVzdA=="
+        }
+    })
+    
+    def callback_print(chunk, read_size):
+        try:
+            text = chunk.decode('utf-8')
+            print(f"{read_size} 收到数据: {text.strip()}")
+        except UnicodeDecodeError:
+            print(f"{read_size} 收到二进制数据: {len(chunk)} 字节")
+    
+    sync_stream_with_requests(url, 'POST', data, headers, callback_print)
+    
     
