@@ -159,9 +159,9 @@ $.etcd.ajaxStream = function(url, datastr, fn, requestHeader, options){
 
     requestHeader['Content-Type'] = 'application/json; charset=UTF-8';
 	requestHeader['x-target-url'] = url;	
-	// requestHeader['x-etcd'] = true
-	requestHeader['x-target-url'] = 'http://localhost:8080/v3/stream';
-	requestHeader['x-etcd'] = false
+	requestHeader['x-etcd'] = true
+	// requestHeader['x-target-url'] = 'http://localhost:8080/v3/stream';
+	// requestHeader['x-etcd'] = false
     /**/
 	// requestHeader['x-Authorization'] = requestHeader['x-Authorization']
     if(!$.extends.isEmpty(requestHeader.token)){
@@ -185,16 +185,7 @@ $.etcd.ajaxStream = function(url, datastr, fn, requestHeader, options){
         )
  */
 
-	// $.app.ajaxStream(API_URL+'/proxy/streamapi', opt,
-	//     function(xhr, state, chunk){
-	//     if(!$.extends.isEmpty(chunk)){
-	//         if(fn){
-	//             fn(xhr, state, chunk)
-	//         }
-	//     }
-	// });
-	
-	$.app.ajaxStream('http://localhost:8080/v3/stream', opt,
+	$.app.ajaxStream(API_URL+'/proxy/streamapi', opt,
 	    function(xhr, state, chunk){
 	    if(!$.extends.isEmpty(chunk)){
 	        if(fn){
@@ -202,6 +193,15 @@ $.etcd.ajaxStream = function(url, datastr, fn, requestHeader, options){
 	        }
 	    }
 	});
+	
+	// $.app.ajaxStream('http://localhost:8080/v3/stream', opt,
+	//     function(xhr, state, chunk){
+	//     if(!$.extends.isEmpty(chunk)){
+	//         if(fn){
+	//             fn(xhr, state, chunk)
+	//         }
+	//     }
+	// });
 	
     // $.app.ajaxStream('http://localhost:8080/v3/stream', opt,
     //     function(xhr, state, chunk){

@@ -16,6 +16,7 @@ _logger = Logger('dataflow.utils.web.asgi_proxy')
 class ProxyConfig:
     """代理配置"""
     timeout: float = 30.0
+    stream_timeout: float = None
     max_connections: int = 100
     enable_caching: bool = False
     cache_ttl: int = 300
@@ -48,6 +49,7 @@ class AdvancedProxyService:
     def __init__(self, config: ProxyConfig = None):
         self.config = config or ProxyConfig()
         self.client = None
+        self.stream_client = None
         self.client_sync = None
         self.request_log = []
         self.rate_limits = {}
@@ -82,6 +84,28 @@ class AdvancedProxyService:
             self.client_sync = None
             raise
         
+    @asynccontextmanager
+    async def get_stream_client(self):
+        """获取HTTP客户端"""
+        if self.stream_client is None:
+            limits = httpx.Limits(
+                max_connections=self.config.max_connections,
+                max_keepalive_connections=20
+            )
+            self.stream_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(connect=None, read=None, write=None, pool=None) if self.config.stream_timeout is None or not self.config.stream_timeout else self.config.stream_timeout,
+                # timeout=self.config.timeout,
+                limits=limits,
+                follow_redirects=True
+            )
+            
+        try:
+            yield self.stream_client
+        except Exception:
+            await self.stream_client.aclose()
+            self.stream_client = None
+            raise
+            
     @asynccontextmanager
     async def get_client(self):
         """获取HTTP客户端"""
@@ -548,36 +572,12 @@ class AdvancedProxyService:
         #     raise e
         # except Exception as e:
         #     raise e
-
-# async def get_response_stream(_request:Request):
-        #     async def gen_stream():
-        #         async with aps.get_client() as client:
-        #             async with client.stream('POST', "http://localhost:8080/v3/stream", content=body, params=None) as response:                 
-        #                 response.raise_for_status()
-        #                 yield response
-                        
-        #                 # 创建 StreamingResponse
-        #                 async for chunk in response.aiter_bytes():
-        #                     try:
-        #                         _logger.DEBUG(f'RECV={chunk}')
-        #                         yield chunk
-        #                     except Exception as e:
-        #                         _logger.ERROR(f'客户端断开连接={e}')
-        #                         # 客户端断开连接
-        #                         break
-                            
-        #                 _logger.DEBUG('流响应结束')
-                        
-        #     _sr = gen_stream()
-        #     _response = await _sr.__anext__()
-        #     return _response, _sr
-        
-        # response, sr = await get_response_stream(request)
         
     async def async_response_stream(self,url:str, method:str='GET',data=None, content=None, headers: dict = None, params=None):
         async def gen_stream():
-            async with self.get_client() as client:
-                async with client.stream(method=method, url=url, content=content, params=params, data=data, headers=headers or {}) as response: 
+            async with self.get_stream_client() as client:
+                async with client.stream(method=method, url=url, content=content, params=params,
+                                         data=data, headers=headers or {}, timeout=self.config.stream_timeout) as response: 
                     response.raise_for_status()
                     yield response
                     # 创建 StreamingResponse
@@ -608,9 +608,10 @@ class AdvancedProxyService:
             method: HTTP方法
             headers: 请求头
         """    
-        async with self.get_client() as client:
+        async with self.get_stream_client() as client:
             client:httpx.AsyncClient = client
-            async with client.stream(method, url, headers=headers or {}, data=data, content=content, params=params) as response:  
+            async with client.stream(method, url, headers=headers or {}, data=data, 
+                                     content=content, params=params, timeout=self.config.stream_timeout) as response:  
                 # _logger.DEBUG(f'response.status_code={response.status_code} header={dict(response.headers)}')                    
                 # 先检查响应状态
                 response.raise_for_status()
