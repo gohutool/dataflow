@@ -2,12 +2,12 @@ from fastapi import Request, HTTPException
 from fastapi.responses import Response, JSONResponse,StreamingResponse
 import httpx
 import time
-from typing import Dict, Optional, Callable
+from typing import Dict, Optional, Callable,Generator,AsyncGenerator
 from dataclasses import dataclass
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager,contextmanager
 from dataflow.utils.log import Logger
 import asyncio
-import requests
+# from asyncio import AsynGenerator
 import json
 
 _logger = Logger('dataflow.utils.web.asgi_proxy')
@@ -22,12 +22,33 @@ class ProxyConfig:
     rate_limit: Optional[int] = None
     blocked_user_agents: list[str] = None
 
+class StreamResponse:
+    @staticmethod
+    async def _convert(gen1):
+        async for one in gen1:
+            yield one[0]
+    
+    def __init__(self, response, gen:Generator|AsyncGenerator):
+        self.response = response
+        self._gen = gen
+        
+    def getResponse(self):
+        return self.response
+    
+    def streams(self):
+        return self._gen
+    
+    async def chunkstreams(self):
+        return StreamResponse._convert(self._gen)
+        
+
 class AdvancedProxyService:
     """高级代理服务"""
     
     def __init__(self, config: ProxyConfig = None):
         self.config = config or ProxyConfig()
         self.client = None
+        self.client_sync = None
         self.request_log = []
         self.rate_limits = {}
         self.cache = {}
@@ -40,6 +61,27 @@ class AdvancedProxyService:
                 "scanner"
             ]
     
+    @contextmanager
+    def get_client_sync(self):
+        """获取HTTP客户端"""
+        if self.client_sync is None:
+            limits = httpx.Limits(
+                max_connections=self.config.max_connections,
+                max_keepalive_connections=20
+            )
+            self.client_sync = httpx.Client(
+                timeout=self.config.timeout,
+                limits=limits,
+                follow_redirects=True
+            )
+        
+        try:
+            yield self.client_sync
+        except Exception:
+            self.client_sync.close()
+            self.client_sync = None
+            raise
+        
     @asynccontextmanager
     async def get_client(self):
         """获取HTTP客户端"""
@@ -281,55 +323,319 @@ class AdvancedProxyService:
         """流式代理（用于大文件或流媒体）"""
         if not url.startswith(('http://', 'https://')):
             url = 'https://' + url
-        
-        async with self.get_client() as client:
-            try:
-                # 创建流式请求
-                headers = self.prepare_headers(dict(request.headers))
-                
-                if callable(header_callback):
-                    _tmp = header_callback(headers)
-                    if _tmp is not None:
-                        headers = _tmp
-                        
-                
-                headers.update({
-                    "Accept": "text/event-stream",
-                    "Connection": "keep-alive",
-                    "Cache-Control": "no-cache"
-                })
-                
-                body_content = await request.body()
+            
+        try:
+            # 创建流式请求
+            headers = self.prepare_headers(dict(request.headers))
+            if callable(header_callback):
+                _tmp = header_callback(headers)
+                if _tmp is not None:
+                    headers = _tmp
                     
-                async with client.stream(
-                    method=request.method,
-                    url=url,
-                    headers=headers,
-                    params=dict(request.query_params),
-                    content=body_content
-                ) as response:
-                    
-                    async def generate():
-                        try:
-                            async for chunk in response.aiter_bytes():
-                                yield chunk                            
-                        except asyncio.CancelledError:
-                            # 当客户端断开时，会在这里抛出 CancelledError
-                            _logger.DEBUG("Client disconnected, closing stream")
-                            # 我们可以在这里做一些清理工作，但是 resp 的上下文管理器会帮我们关闭连接
-                            raise
-                        except Exception as e:
-                            raise e
-                    
-                    return StreamingResponse(
-                        generate(),
+            headers.update({
+                "Accept": "text/event-stream",
+                "Connection": "keep-alive",
+                "Cache-Control": "no-cache"
+            })        
+            
+            body_content = await request.body()
+            
+            streamreponse:StreamResponse = await self.async_stream_http_request(url=url,method=request.method,data=None, content=body_content,headers=headers,params=dict(request.query_params))
+            response = streamreponse.getResponse()
+            return StreamingResponse(
+                        await streamreponse.chunkstreams(),
                         status_code=response.status_code,
                         headers=dict(response.headers)
-                    )
+            )            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+        # async with self.get_client() as client:
+        #     try:
+        #         # 创建流式请求
+        #         headers = self.prepare_headers(dict(request.headers))
+                
+        #         if callable(header_callback):
+        #             _tmp = header_callback(headers)
+        #             if _tmp is not None:
+        #                 headers = _tmp
+                        
+                
+        #         headers.update({
+        #             "Accept": "text/event-stream",
+        #             "Connection": "keep-alive",
+        #             "Cache-Control": "no-cache"
+        #         })
+                
+        #         body_content = await request.body()
                     
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=str(e))
+        #         # async with client.stream(
+        #         #     method=request.method,
+        #         #     url=url,
+        #         #     headers=headers,
+        #         #     params=dict(request.query_params),
+        #         #     content=body_content
+        #         # ) as response:
+                    
+        #         #     async def generate():
+        #         #         try:
+        #         #             async for chunk in response.aiter_bytes():
+        #         #                 yield chunk                            
+        #         #         except asyncio.CancelledError:
+        #         #             # 当客户端断开时，会在这里抛出 CancelledError
+        #         #             _logger.DEBUG("Client disconnected, closing stream")
+        #         #             # 我们可以在这里做一些清理工作，但是 resp 的上下文管理器会帮我们关闭连接
+        #         #             raise
+        #         #         except Exception as e:
+        #         #             raise e
+                    
+        #         #     return StreamingResponse(
+        #         #         generate(),
+        #         #         status_code=response.status_code,
+        #         #         headers=dict(response.headers)
+        #         #     )
+                    
+            # except Exception as e:
+            #     raise HTTPException(status_code=500, detail=str(e))
+
+    def sync_read_stream_with_requests(self, url, method='GET', data=None, content=None, headers=None, params=None)->StreamResponse:
+        gen = self._sync_read_stream_with_requests(url, method, data, content, headers, params)
+        return StreamResponse(next(gen), gen)
+    
+    def _sync_read_stream_with_requests(self, url, method='GET', data=None, content=None, headers=None, params=None)->Generator[bytes, None, int]:
+        """
+        同步流式HTTP请求生成器
         
+        Args:
+            url: 请求URL
+            method: HTTP方法
+            headers: 请求头
+        """
+        with self.get_client_sync() as client:
+            client:httpx.Client = client            
+            with client.stream(method, url, headers=headers or {}, data=data, content=content, params=params) as response:                
+                # 先检查响应状态
+                response.raise_for_status()
+                yield response
+                
+                # 然后返回数据流
+                bytes_received = 0
+                times = 0
+                for chunk in response.iter_bytes():
+                    if chunk:  # 只返回非空数据块
+                        bytes_received += len(chunk)
+                        times += 1
+                        yield chunk, bytes_received, times
+        # try:
+        #     response = requests.request(
+        #         method=method,
+        #         url=url,
+        #         data=data,
+        #         headers=headers,
+        #         stream=True,  # 关键参数
+        #         timeout=30
+        #     )
+            
+        #     # 检查响应状态
+        #     if response.status_code != 200:
+        #         # print(f"请求失败，状态码: {response.status_code}")
+        #         raise Exception(f"请求失败，状态码: {response.status_code}")
+            
+        #     # print(f"开始接收流式数据 (状态码: {response.status_code})")
+        #     # print(f"Content-Type: {response.headers.get('content-type')}")
+            
+        #     # 逐块读取数据
+        #     bytes_received = 0
+        #     # start_time = time.time()
+        #     times =  0
+        #     for chunk in response.iter_content(chunk_size=1024):
+        #         times += 1
+        #         if chunk:  # 过滤掉 keep-alive 新块
+        #             bytes_received += len(chunk)
+        #             yield chunk,bytes_received,times 
+                    
+        #             # elapsed = time.time() - start_time
+                    
+        #             # # 尝试解码为文本
+        #             # try:
+        #             #     text = chunk.decode('utf-8')
+        #             #     print(f"[{elapsed:.2f}s] 收到数据: {text.strip()}")
+        #             # except UnicodeDecodeError:
+        #             #     print(f"[{elapsed:.2f}s] 收到二进制数据: {len(chunk)} 字节")
+                    
+        #     # print(f"流式传输完成，总共接收: {bytes_received} 字节")
+        #     return bytes_received
+        # except requests.exceptions.RequestException as e:
+        #     raise e
+        # except Exception as e:
+        #     raise e
+        
+    def sync_stream_with_requests(self, url, method='GET', data=None, content=None, headers=None, func:Callable=None, params=None)->int:
+        """
+        同步流式HTTP请求生成器
+        
+        Args:
+            url: 请求URL
+            method: HTTP方法
+            headers: 请求头
+        """
+        with self.get_client_sync() as client:
+            client:httpx.Client = client            
+            with client.stream(method, url, headers=headers or {}, data=data, content=content, params=params) as response:                
+                # 先检查响应状态
+                response.raise_for_status()
+                print(f"请求失败，状态码: {response.status_code} {response.headers}")                
+                # 检查响应状态
+                if response.status_code != 200:
+                    # print(f"请求失败，状态码: {response.status_code}")
+                    raise Exception(f"请求失败，状态码: {response.status_code}")
+                
+                # 然后返回数据流
+                bytes_received = 0
+                times = 0
+                for chunk in response.iter_bytes():
+                    if chunk:  # 过滤掉 keep-alive 新块
+                        bytes_received += len(chunk)
+                        times += 1
+                        if callable(func):
+                            rtn = func(chunk, bytes_received, times)
+                            if rtn:
+                                break
+        # """使用 requests 进行流式请求"""
+        # try:
+        #     response = requests.request(
+        #         method=method,
+        #         url=url,
+        #         data=data,
+        #         headers=headers,
+        #         stream=True,  # 关键参数
+        #         timeout=30
+        #     )
+            
+        #     # 检查响应状态
+        #     if response.status_code != 200:
+        #         # print(f"请求失败，状态码: {response.status_code}")
+        #         raise Exception(f"请求失败，状态码: {response.status_code}")
+            
+        #     # print(f"开始接收流式数据 (状态码: {response.status_code})")
+        #     # print(f"Content-Type: {response.headers.get('content-type')}")
+            
+        #     # 逐块读取数据
+        #     bytes_received = 0
+        #     times = 0
+        #     # start_time = time.time()
+            
+        #     for chunk in response.iter_content(chunk_size=1024):
+        #         if chunk:  # 过滤掉 keep-alive 新块
+        #             bytes_received += len(chunk)
+        #             times += 1
+        #             if callable(func):
+        #                 rtn = func(chunk, bytes_received, times)
+        #                 if rtn:
+        #                     break
+                    
+        #             # elapsed = time.time() - start_time
+                    
+        #             # # 尝试解码为文本
+        #             # try:
+        #             #     text = chunk.decode('utf-8')
+        #             #     print(f"[{elapsed:.2f}s] 收到数据: {text.strip()}")
+        #             # except UnicodeDecodeError:
+        #             #     print(f"[{elapsed:.2f}s] 收到二进制数据: {len(chunk)} 字节")
+                    
+        #     # print(f"流式传输完成，总共接收: {bytes_received} 字节")
+        #     return bytes_received
+        # except requests.exceptions.RequestException as e:
+        #     raise e
+        # except Exception as e:
+        #     raise e
+
+# async def get_response_stream(_request:Request):
+        #     async def gen_stream():
+        #         async with aps.get_client() as client:
+        #             async with client.stream('POST', "http://localhost:8080/v3/stream", content=body, params=None) as response:                 
+        #                 response.raise_for_status()
+        #                 yield response
+                        
+        #                 # 创建 StreamingResponse
+        #                 async for chunk in response.aiter_bytes():
+        #                     try:
+        #                         _logger.DEBUG(f'RECV={chunk}')
+        #                         yield chunk
+        #                     except Exception as e:
+        #                         _logger.ERROR(f'客户端断开连接={e}')
+        #                         # 客户端断开连接
+        #                         break
+                            
+        #                 _logger.DEBUG('流响应结束')
+                        
+        #     _sr = gen_stream()
+        #     _response = await _sr.__anext__()
+        #     return _response, _sr
+        
+        # response, sr = await get_response_stream(request)
+        
+    async def async_response_stream(self,url:str, method:str='GET',data=None, content=None, headers: dict = None, params=None):
+        async def gen_stream():
+            async with self.get_client() as client:
+                async with client.stream(method=method, url=url, content=content, params=params, data=data, headers=headers or {}) as response: 
+                    response.raise_for_status()
+                    yield response
+                    # 创建 StreamingResponse
+                    async for chunk in response.aiter_bytes():
+                        try:
+                            _logger.DEBUG(f'RECV={chunk}')
+                            yield chunk
+                        except Exception as e:
+                            _logger.ERROR(f'客户端断开连接={e}')
+                            # 客户端断开连接
+                            break                        
+                    _logger.DEBUG('流响应结束')
+        _sr = gen_stream()
+        _response = await _sr.__anext__()
+        return _response, _sr
+        
+    async def async_stream_http_request(self, url: str, method: str = "GET", data=None, content=None, headers: dict = None, params=None, checkfunc:Callable=None)->StreamResponse:
+        gen = self._async_stream_http_request(url, method, data, content, headers, params, checkfunc)
+        response_info = await gen.__anext__()
+        return StreamResponse(response_info, gen)
+        
+    async def _async_stream_http_request(self, url: str, method: str = "GET", data=None, content=None, headers: dict = None, params=None, checkfunc:Callable=None)->AsyncGenerator[tuple[bytes, None, int]|Response,None]:
+        """
+        异步流式HTTP请求生成器
+        
+        Args:
+            url: 请求URL
+            method: HTTP方法
+            headers: 请求头
+        """    
+        async with self.get_client() as client:
+            client:httpx.AsyncClient = client
+            async with client.stream(method, url, headers=headers or {}, data=data, content=content, params=params) as response:  
+                # _logger.DEBUG(f'response.status_code={response.status_code} header={dict(response.headers)}')                    
+                # 先检查响应状态
+                response.raise_for_status()
+                yield response
+                
+                bytes_received = 0
+                times = 0
+                async for chunk in response.aiter_bytes():
+                    try:
+                        bytes_received += len(chunk)   
+                        times += 1
+                        if callable(checkfunc):
+                            checked = await checkfunc(chunk)
+                            if checked is not None and checked is False:                            
+                                break
+                                
+                        if chunk:  # 只返回非空数据块
+                            yield chunk,bytes_received,times 
+                    except Exception as e:
+                        _logger.ERROR(f'客户端断开连接={e}')
+                        # 客户端断开连接
+                        break
+                    
+                _logger.ERROR('流响应结束')
+            
 
 # 创建高级代理应用
 def get_default_config():
@@ -341,59 +647,11 @@ def get_default_config():
     )
     return _default_config
 
-
-def sync_stream_with_requests(url, method='GET', data=None, headers=None, func:Callable=None)->int:
-    """使用 requests 进行流式请求"""
-    try:
-        response = requests.request(
-            method=method,
-            url=url,
-            data=data,
-            headers=headers,
-            stream=True,  # 关键参数
-            timeout=30
-        )
-        
-        # 检查响应状态
-        if response.status_code != 200:
-            # print(f"请求失败，状态码: {response.status_code}")
-            raise Exception(f"请求失败，状态码: {response.status_code}")
-        
-        # print(f"开始接收流式数据 (状态码: {response.status_code})")
-        # print(f"Content-Type: {response.headers.get('content-type')}")
-        
-        # 逐块读取数据
-        bytes_received = 0
-        # start_time = time.time()
-        
-        for chunk in response.iter_content(chunk_size=1024):
-            if chunk:  # 过滤掉 keep-alive 新块
-                bytes_received += len(chunk)
-                
-                if callable(func):
-                    rtn = func(chunk, bytes_received)
-                    if rtn:
-                        return
-                
-                # elapsed = time.time() - start_time
-                
-                # # 尝试解码为文本
-                # try:
-                #     text = chunk.decode('utf-8')
-                #     print(f"[{elapsed:.2f}s] 收到数据: {text.strip()}")
-                # except UnicodeDecodeError:
-                #     print(f"[{elapsed:.2f}s] 收到二进制数据: {len(chunk)} 字节")
-                
-        # print(f"流式传输完成，总共接收: {bytes_received} 字节")
-        return bytes_received
-    except requests.exceptions.RequestException as e:
-        raise e
-    except Exception as e:
-        raise e
         
 if __name__ == "__main__":
     # 测试 Server-Sent Events
-    url = "http://localhost:8080/v3/stream"
+    url = "http://localhost:8080/v3/watch"
+    # url = "http://localhost:12379/v3/watch"
     headers = {
         "Content-Type": "application/json",
         "Accept": "text/event-stream"
@@ -404,13 +662,63 @@ if __name__ == "__main__":
         }
     })
     
-    def callback_print(chunk, read_size):
+    def callback_print(chunk, read_size, times):
         try:
             text = chunk.decode('utf-8')
-            print(f"{read_size} 收到数据: {text.strip()}")
+            print(f"{times}  {read_size} 收到数据: {text.strip()}")
         except UnicodeDecodeError:
-            print(f"{read_size} 收到二进制数据: {len(chunk)} 字节")
+            print(f"{times}  {read_size} 收到二进制数据: {len(chunk)} 字节")
+            
+        if times > 20:
+            return True
     
-    sync_stream_with_requests(url, 'POST', data, headers, callback_print)
+    aps = AdvancedProxyService()
     
+    # aps.sync_stream_with_requests(url, 'POST', data, None, headers, callback_print)
+    # exit()
+    
+    # stream_generator = aps.sync_read_stream_with_requests(url, 'POST', data, None, headers)
+    
+    # res:Response = next(stream_generator)
+    # _logger.DEBUG(f'response.status_code={res.status_code} header={dict(res.headers)}')
+    # for chunk, read_size,times in stream_generator:
+    #     if callback_print(chunk, read_size, times):
+    #         break
+    
+    # streamresponse = aps.sync_read_stream_with_requests(url, 'POST', data, None, headers)
+    
+    # res:Response = streamresponse.getResponse()
+    # _logger.DEBUG(f'response.status_code={res.status_code} header={dict(res.headers)}')
+    # for chunk, read_size,times in streamresponse.streams():
+    #     if callback_print(chunk, read_size, times):
+    #         break
+        
+    async def main():
+        """测试函数"""
+        print("开始测试HTTP流式请求...")
+        
+        # try:
+        #     stream_generator = aps.async_stream_http_request(url, 'POST')
+            
+        #     res:Response = await stream_generator.__anext__()
+        #     _logger.DEBUG(f'response.status_code={res.status_code} header={dict(res.headers)}')
+        #     # 使用异步生成器
+        #     async for chunk, read_size,times in stream_generator:
+        #         if callback_print(chunk, read_size, times):
+        #             break                
+        # except Exception as e:
+        #     print(f"请求失败: {e}")
+        try:
+            streamresponse = await aps.async_stream_http_request(url, 'POST', data, None, headers)
+            
+            res:Response = streamresponse.getResponse()
+            _logger.DEBUG(f'response.status_code={res.status_code} header={dict(res.headers)}')
+            # 使用异步生成器
+            async for chunk, read_size,times in streamresponse.streams():
+                if callback_print(chunk, read_size, times):
+                    break                
+        except Exception as e:
+            print(f"请求失败: {e}")
+            
+    asyncio.run(main())
     

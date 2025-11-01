@@ -185,16 +185,7 @@ $.etcd.ajaxStream = function(url, datastr, fn, requestHeader, options){
         )
  */
 
-	$.app.ajaxStream(API_URL+'/proxy/streamapi', opt,
-	    function(xhr, state, chunk){
-	    if(!$.extends.isEmpty(chunk)){
-	        if(fn){
-	            fn(xhr, state, chunk)
-	        }
-	    }
-	});
-	
-	// $.app.ajaxStream('http://localhost:8080/v3/stream', opt,
+	// $.app.ajaxStream(API_URL+'/proxy/streamapi', opt,
 	//     function(xhr, state, chunk){
 	//     if(!$.extends.isEmpty(chunk)){
 	//         if(fn){
@@ -202,6 +193,15 @@ $.etcd.ajaxStream = function(url, datastr, fn, requestHeader, options){
 	//         }
 	//     }
 	// });
+	
+	$.app.ajaxStream('http://localhost:8080/v3/stream', opt,
+	    function(xhr, state, chunk){
+	    if(!$.extends.isEmpty(chunk)){
+	        if(fn){
+	            fn(xhr, state, chunk)
+	        }
+	    }
+	});
 	
     // $.app.ajaxStream('http://localhost:8080/v3/stream', opt,
     //     function(xhr, state, chunk){

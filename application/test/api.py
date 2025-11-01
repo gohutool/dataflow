@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from dataflow.module.context.web import limiter
 from dataflow.module.context.redis import RedisContext
 from dataflow.module.context.kafka import KafkaContext
+from dataflow.utils.web.asgi_proxy import AdvancedProxyService,StreamResponse
 
 from application.test.service import ItemService, getInfos, UerService
 import httpx
@@ -144,34 +145,46 @@ async def sse(request: Request):
 
 @app.post("/v3/watch")
 async def watch(request: Request):
-    async with httpx.AsyncClient() as client, \
-               client.stream("POST",
-                            #  "http://localhost:12379/v3/watch",
-                            "http://localhost:8080/v3/stream",
-                             headers=request.headers.raw,
-                             content=await request.body()) as resp:
-        try:
-            async def generate():
-                try:
-                    async for chunk in resp.aiter_bytes():
-                        yield chunk
-                except asyncio.CancelledError:
-                    # 当客户端断开时，会在这里抛出 CancelledError
-                    print("Client disconnected, closing stream")
-                    # 我们可以在这里做一些清理工作，但是 resp 的上下文管理器会帮我们关闭连接
-                    raise
-
-            return StreamingResponse(generate(),
-                                        status_code=resp.status_code,
-                                        headers=resp.headers)
-        except Exception as e:
-            print(f"Error in watch: {e}")
-            raise
+    try:        
+        def check_func(_request:Request):
+            async def check(chunk:bytes)->bool:
+                return not await _request.is_disconnected()
+            return check
             
-        # return StreamingResponse(resp.aiter_bytes(),
-        #                          status_code=resp.status_code,
-        #                          headers=resp.headers)
+        aps:AdvancedProxyService = Context.getContext().getBean(AdvancedProxyService)
+        body = await request.body()
         
+        sr:StreamResponse = await aps.async_stream_http_request(
+            "http://localhost:8080/v3/stream",
+            # "http://localhost:12379/v3/watch",
+                                    'POST',
+                                    data=None,
+                                    content=body,
+                                    headers=None,
+                                    params=None,
+                                    checkfunc=check_func(request))
+        response = sr.getResponse()
+        return StreamingResponse(await sr.chunkstreams(),
+                                    status_code=response.status_code,
+                                    headers=response.headers)
+        
+        # response, sr = await aps.async_response_stream(
+        #         "http://localhost:8080/v3/stream",
+        #         # "http://localhost:12379/v3/watch",
+        #         'POST',
+        #         data=None,
+        #         content=body,
+        #         headers=None,
+        #         params=None,                
+        #     )
+        
+        # return StreamingResponse(sr,
+        #                         status_code=response.status_code,
+        #                         headers=response.headers)
+        
+    except Exception as e:
+        raise e
+    
 @app.get("/test/getrequest")
 async def test_get_request():
     _logger.INFO('测试获取Request组件')
