@@ -203,5 +203,11 @@ class ETCDV3Controller:
                     # "is-session-timeout": "1",
                     # "is-application-exception": "1",
                 })
-        return await self.aps.bind_streaming_proxy(request, target_url, self.proxy_prepare_header)
         
+        return await self.aps.bind_streaming_proxy(request, target_url, self.proxy_prepare_header,checkfunc=_check_func(request))
+        
+def _check_func(_request:Request):
+    async def check(chunk:bytes)->bool:
+        _logger.DEBUG(f'RECEIVE={chunk}')
+        return not await _request.is_disconnected()
+    return check

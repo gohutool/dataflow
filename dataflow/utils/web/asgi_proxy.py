@@ -342,8 +342,8 @@ class AdvancedProxyService:
             url = 'https://' + url
             
         return await self.proxy_request(url, request, None, header_callback)
-    
-    async def bind_streaming_proxy(self, request: Request, url: str, header_callback:Callable = None): 
+        
+    async def bind_streaming_proxy(self, request: Request, url: str, header_callback:Callable = None,checkfunc:Callable=None): 
         """流式代理（用于大文件或流媒体）"""
         if not url.startswith(('http://', 'https://')):
             url = 'https://' + url
@@ -364,7 +364,11 @@ class AdvancedProxyService:
             
             body_content = await request.body()
             
-            streamreponse:StreamResponse = await self.async_stream_http_request(url=url,method=request.method,data=None, content=body_content,headers=headers,params=dict(request.query_params))
+            streamreponse:StreamResponse = await self.async_stream_http_request(url=url,method=request.method,data=None, 
+                                                content=body_content,headers=headers,
+                                                params=dict(request.query_params),
+                                                checkfunc=checkfunc)
+            
             response = streamreponse.getResponse()
             return StreamingResponse(
                         await streamreponse.chunkstreams(),
@@ -625,7 +629,8 @@ class AdvancedProxyService:
                         times += 1
                         if callable(checkfunc):
                             checked = await checkfunc(chunk)
-                            if checked is not None and checked is False:                            
+                            if checked is not None and checked is False:    
+                                _logger.DEBUG("⛔ 客户端断开，代理停止")                        
                                 break
                                 
                         if chunk:  # 只返回非空数据块
